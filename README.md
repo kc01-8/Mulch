@@ -6,6 +6,10 @@
 
 A fully offline Arch Linux installer with KDE Plasma, gaming support, and a curated set of applications.
 
+## Download ISO & Install
+
+Download ISO, Write to USB, and boot
+
 ## Building the ISO
 
 Requires a working Arch Linux system with `archiso` installed.
@@ -65,17 +69,17 @@ Follow the guided TUI installer. No internet connection is required.
 ## GPU Support
 
 The installer auto-detects your GPU and offers:
-- NVIDIA (nvidia-dkms, proprietary)
-- AMD (mesa, open-source)
-- Intel (mesa, open-source)
+ NVIDIA (nvidia-dkms, proprietary)
+ AMD (mesa, open-source)
+ Intel (mesa, open-source)
 
 ## Gaming Optimisations Included
 
-- vm.max_map_count raised to 2147483642
-- File descriptor limits raised for esync/fsync
-- Gamemode
-- Wine-staging + dependencies
-- Native Steam (no Flatpak)
-- Steam auto-launches on login (minimised to tray)
+vm.max_map_count raised to 2147483642
+ File descriptor limits raised for esync/fsync
+ Gamemode
+ Wine-staging + dependencies
+ Native Steam (no Flatpak)
+ Steam auto-launches on login (minimised to tray)
 
 </div>

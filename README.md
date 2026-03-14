@@ -1,3 +1,5 @@
+<div align="center">
+
 # Mulch Linux
 
 A fully offline Arch Linux installer with KDE Plasma, gaming support, and a curated set of applications.
@@ -62,3 +64,5 @@ The installer auto-detects your GPU and offers:
 - Wine-staging + dependencies
 - Native Steam (no Flatpak)
 - Steam auto-launches on login (minimised to tray)
+
+</div>

@@ -5,7 +5,6 @@
 **A curated Arch Linux distribution.**\
 **Private by default. Game-ready out of the box.**
 
-[![Built on Arch](https://img.shields.io/badge/Built_on-Arch_Linux-1793D1?style=flat-square&logo=archlinux&logoColor=white)](https://archlinux.org)
 [![License](https://img.shields.io/github/license/kc01-8/mulch-linux?style=flat-square&color=9333ea&label=License)](https://github.com/kc01-8/mulch-linux/blob/main/LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/kc01-8/mulch-linux?style=flat-square&color=22c55e&label=Latest)](https://github.com/kc01-8/mulch-linux/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/kc01-8/mulch-linux?style=flat-square&color=eab308&label=Stars)](https://github.com/kc01-8/mulch-linux/stargazers)
@@ -14,7 +13,7 @@
 
 Minimal KDE Plasma desktop · Hand-picked software · Fully offline installation · Real privacy tools
 
-[**Download ISO**](https://github.com/kc01-8/mulch-linux/releases) · [**Report Issue**](https://github.com/kc01-8/mulch-linux/issues) · [**Website**](https://kc01-8.github.io/mulch-linux)
+[**Download ISO**](https://github.com/kc01-8/mulch-linux/releases) · [**Report Issue**](https://github.com/kc01-8/mulch-linux/issues) · [**Website**](https://kc01-8.github.io/MulchHomepage/)
 
 </div>
 

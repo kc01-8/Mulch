@@ -35,6 +35,7 @@ sudo ./build-aur-repo.sh
 
 # 4 — Build the ISO (requires internet for first run)
 sudo ./build.sh
+
 ```
 
 The final ISO appears in `out/`.

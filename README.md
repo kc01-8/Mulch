@@ -1,111 +1,112 @@
 <div align="center">
 
-# 🟣 Mulch Linux 🟣
+<br>
 
-**A curated Arch Linux distribution.**\
+# Mulch Linux
+
+**A curated Arch Linux distribution.**<br>
 **Private by default. Game-ready out of the box.**
 
-[![License](https://img.shields.io/github/license/kc01-8/mulch-linux?style=flat-square&color=9333ea&label=License)](https://github.com/kc01-8/mulch-linux/blob/main/LICENSE)
-[![Latest Release](https://img.shields.io/github/v/release/kc01-8/mulch-linux?style=flat-square&color=22c55e&label=Latest)](https://github.com/kc01-8/mulch-linux/releases)
-[![GitHub Stars](https://img.shields.io/github/stars/kc01-8/mulch-linux?style=flat-square&color=eab308&label=Stars)](https://github.com/kc01-8/mulch-linux/stargazers)
+<br>
 
----
+[![Built on Arch](https://img.shields.io/badge/Built_on-Arch_Linux-1793D1?style=for-the-badge&logo=archlinux&logoColor=white)](https://archlinux.org)
+[![License](https://img.shields.io/github/license/kc01-8/mulch-linux?style=for-the-badge&color=9333ea&label=License)](https://github.com/kc01-8/mulch-linux/blob/main/LICENSE)
+[![Latest Release](https://img.shields.io/github/v/release/kc01-8/mulch-linux?style=for-the-badge&color=22c55e&label=Latest)](https://github.com/kc01-8/mulch-linux/releases)
+[![GitHub Stars](https://img.shields.io/github/stars/kc01-8/mulch-linux?style=for-the-badge&color=eab308&label=Stars)](https://github.com/kc01-8/mulch-linux/stargazers)
+
+<br>
 
 Minimal KDE Plasma desktop · Hand-picked software · Fully offline installation · Real privacy tools
 
-[**Download ISO**](https://github.com/kc01-8/mulch-linux/releases) · [**Report Issue**](https://github.com/kc01-8/mulch-linux/issues) · [**Website**](https://kc01-8.github.io/MulchHomepage/)
+<br>
 
-</div>
+[**⬇ Download ISO**](https://github.com/kc01-8/mulch-linux/releases)&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;[**🐛 Report Issue**](https://github.com/kc01-8/mulch-linux/issues)&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;[**🌐 Website**](https://kc01-8.github.io/mulch-linux)
+
+<br>
 
 ---
+
+<br>
 
 ## ✨ Features
 
-<table>
-<tr>
-<td width="50%">
+<br>
 
-### 🔒 Private by Default
-Mullvad VPN and Mullvad Browser ship pre-installed. Tor Browser included. KeePassXC with browser integration configured out of the box.
+🔒 **Private by Default**<br>
+Mullvad VPN and Mullvad Browser ship pre-installed. Tor Browser included.<br>
+KeePassXC with browser integration configured out of the box.
 
-</td>
-<td width="50%">
+<br>
 
-### 🎮 Game-Ready
-Native Steam, Wine-staging, Gamemode, and every lib32 dependency pre-installed. Kernel tweaks for esync/fsync. Zero setup to start playing.
+🎮 **Game-Ready**<br>
+Native Steam, Wine-staging, Gamemode, and every lib32 dependency pre-installed.<br>
+Kernel tweaks for esync/fsync. Zero setup to start playing.
 
-</td>
-</tr>
-<tr>
-<td width="50%">
+<br>
 
-### ✈️ Fully Offline Install
-Every package is on the ISO. No internet connection needed during installation. Boot it, run the installer, reboot into a complete system.
+✈️ **Fully Offline Install**<br>
+Every package is on the ISO. No internet connection needed during installation.<br>
+Boot it, run the installer, reboot into a complete system.
 
-</td>
-<td width="50%">
+<br>
 
-### ⚡ Zen Kernel
-Linux Zen with BORE scheduler and full preemption. Lower input latency, fewer frame drops, smoother multitasking.
+⚡ **Zen Kernel**<br>
+Linux Zen with BORE scheduler and full preemption.<br>
+Lower input latency, fewer frame drops, smoother multitasking.
 
-</td>
-</tr>
-<tr>
-<td width="50%">
+<br>
 
-### 🖥️ Minimal KDE
-Plasma Desktop with only Dolphin, Konsole, Spectacle, and Ark. No bloat. No PIM suite. No office suite. Yay preinstalled.
+🖥️ **Minimal KDE**<br>
+Plasma Desktop with only Dolphin, Konsole, Spectacle, and Ark.<br>
+No bloat. No PIM suite. No office suite. Yay preinstalled.
 
-</td>
-<td width="50%">
+<br>
 
-### 🛡️ LUKS Encryption
-Optional full-disk encryption offered during install. Btrfs with subvolumes or ext4. Zram swap by default.
+🛡️ **LUKS Encryption**<br>
+Optional full-disk encryption offered during install.<br>
+Btrfs with subvolumes or ext4. Zram swap by default.
 
-</td>
-</tr>
-</table>
+<br>
 
-<div align="center">
-
-| `0` Flatpaks | `0` Snaps | `yay` AUR helper | `micro` Default editor |
+| `0` Flatpaks | `0` Snaps | `yay` AUR Helper | `micro` Default Editor |
 |:---:|:---:|:---:|:---:|
 
-</div>
+<br>
 
 ---
 
+<br>
+
 ## 📦 Pre-installed Software
 
-<details open>
-<summary><strong>🔐 Privacy & Security</strong></summary>
+<br>
+
+### 🔐 Privacy & Security
 
 | Package | Description |
-|:---|:---|
+|:---:|:---:|
 | Mullvad Browser | Privacy browser + KeePassXC extension |
 | Tor Browser | Anonymous browsing |
 | KeePassXC | Offline password manager |
 | Mullvad VPN | VPN client, daemon auto-enabled |
 | Signal Desktop | Encrypted messaging |
 
-</details>
+<br>
 
-<details open>
-<summary><strong>🎮 Gaming</strong></summary>
+### 🎮 Gaming
 
 | Package | Description |
-|:---|:---|
+|:---:|:---:|
 | Steam | Native package, auto-launches |
 | Wine Staging | Windows compatibility layer |
 | Gamemode | Gaming performance optimiser |
 
-</details>
+<br>
 
-<details open>
-<summary><strong>🎵 Media & Documents</strong></summary>
+### 🎵 Media & Documents
 
 | Package | Description |
-|:---|:---|
+|:---:|:---:|
 | mpv | Video player |
 | Strawberry | Music player |
 | qimgv | Image viewer |
@@ -113,40 +114,42 @@ Optional full-disk encryption offered during install. Btrfs with subvolumes or e
 | Zathura | PDF viewer (mupdf backend) |
 | Obsidian | Markdown knowledge base |
 
-</details>
+<br>
 
-<details open>
-<summary><strong>🔧 Utilities</strong></summary>
+### 🔧 Utilities
 
 | Package | Description |
-|:---|:---|
+|:---:|:---:|
 | qBittorrent | Torrent client |
 | micro | Terminal text editor (default `$EDITOR`) |
 | Ark | Archive manager + Dolphin integration |
 | yay | AUR helper |
 
-</details>
+<br>
 
-<details open>
-<summary><strong>🖥️ Desktop</strong></summary>
+### 🖥️ Desktop
 
 | Package | Description |
-|:---|:---|
+|:---:|:---:|
 | KDE Plasma | Minimal install |
 | Dolphin | File manager |
 | Konsole | Terminal emulator |
 | Spectacle | Screenshot tool |
 
-</details>
+<br>
 
 ---
 
+<br>
+
 ## 🚀 Quick Start
 
-### Installing
+<br>
 
 > [!TIP]
 > No internet connection is required during installation. Everything is on the ISO.
+
+<br>
 
 ```bash
 # Write ISO to USB (replace /dev/sdX)
@@ -166,12 +169,20 @@ install-system
 
 The guided TUI installer handles partitioning, encryption, drivers, and everything else.
 
+<br>
+
 ---
+
+<br>
 
 ## 🏗️ Building the ISO
 
+<br>
+
 > [!IMPORTANT]
 > Requires a working Arch Linux system with `archiso` installed.
+
+<br>
 
 ```bash
 # 1 — Install archiso
@@ -189,26 +200,38 @@ sudo ./build.sh
 
 The final ISO appears in `out/`.
 
+<br>
+
 ---
+
+<br>
 
 ## 🖥️ GPU Support
 
+<br>
+
 The installer auto-detects your GPU and offers the appropriate drivers:
 
+<br>
+
 | GPU | Driver | Type |
-|:---|:---|:---|
+|:---:|:---:|:---:|
 | NVIDIA | `nvidia-dkms` | Proprietary |
 | AMD | `mesa` | Open-source |
 | Intel | `mesa` | Open-source |
 
+<br>
+
 ---
+
+<br>
 
 ## ⚙️ Gaming Optimisations
 
-<div align="center">
+<br>
 
 | Optimisation | Detail |
-|:---|:---|
+|:---:|:---:|
 | `vm.max_map_count` | Raised to `2147483642` |
 | File descriptor limits | Raised for esync/fsync |
 | Gamemode | Pre-installed and configured |
@@ -216,11 +239,11 @@ The installer auto-detects your GPU and offers the appropriate drivers:
 | Steam | Native package (no Flatpak) |
 | Steam auto-launch | Launches minimised to tray on login |
 
-</div>
+<br>
 
 ---
 
-<div align="center">
+<br>
 
 ## 📄 License
 
@@ -228,8 +251,10 @@ This project is licensed under the terms found in [`LICENSE`](LICENSE).
 
 Built on [Arch Linux](https://archlinux.org). Not affiliated with Arch Linux or any included project.
 
----
+<br>
 
-**[⬆ Back to top](#-mulch-linux)**
+**[⬆ Back to top](#mulch-linux)**
+
+<br>
 
 </div>

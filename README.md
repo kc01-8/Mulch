@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🟣 Mulch Linux
+# 🟣 Mulch Linux 🟣
 
 **A curated Arch Linux distribution.**\
 **Private by default. Game-ready out of the box.**

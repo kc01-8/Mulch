@@ -1,188 +1,27 @@
-<div align="center">
-
-<br>
-
 # Mulch Linux
 
-**A curated Arch Linux distribution.**<br>
-**Private by default. Game-ready out of the box.**
+A fully offline Arch Linux installer with KDE Plasma, gaming support, and a curated set of applications.
 
-<br>
+## Pre-installed Software
 
-[![Built on Arch](https://img.shields.io/badge/Built_on-Arch_Linux-1793D1?style=for-the-badge&logo=archlinux&logoColor=white)](https://archlinux.org)
-[![License](https://img.shields.io/github/license/kc01-8/mulch-linux?style=for-the-badge&color=9333ea&label=License)](https://github.com/kc01-8/mulch-linux/blob/main/LICENSE)
-[![Latest Release](https://img.shields.io/github/v/release/kc01-8/mulch-linux?style=for-the-badge&color=22c55e&label=Latest)](https://github.com/kc01-8/mulch-linux/releases)
-[![GitHub Stars](https://img.shields.io/github/stars/kc01-8/mulch-linux?style=for-the-badge&color=eab308&label=Stars)](https://github.com/kc01-8/mulch-linux/stargazers)
+| Category       | Packages                                       |
+|----------------|------------------------------------------------|
+| Desktop        | KDE Plasma (minimal)                           |
+| Browser        | Mullvad Browser (+ KeePassXC ext), Tor Browser |
+| Privacy/VPN    | Mullvad VPN, KeePassXC                         |
+| Media          | mpv, Strawberry, qimgv                         |
+| Documents      | Zathura (PDF), Obsidian, 7zip                  |
+| Communication  | Signal Desktop                                 |
+| Gaming         | Steam (native), Wine, Gamemode                 |
+| Torrents       | qBittorrent                                    |
+| Graphics       | LazPaint                                       |
+| Editor         | micro (default $EDITOR)                        |
+| AUR Helper     | yay                                            |
+|----------------|------------------------------------------------|
 
-<br>
+## Building the ISO
 
-Minimal KDE Plasma desktop · Hand-picked software · Fully offline installation · Real privacy tools
-
-<br>
-
-[**⬇ Download ISO**](https://github.com/kc01-8/mulch-linux/releases)&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;[**🐛 Report Issue**](https://github.com/kc01-8/mulch-linux/issues)&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;[**🌐 Website**](https://kc01-8.github.io/mulch-linux)
-
-<br>
-
----
-
-<br>
-
-## ✨ Features
-
-<br>
-
-🔒 **Private by Default**<br>
-Mullvad VPN and Mullvad Browser ship pre-installed. Tor Browser included.<br>
-KeePassXC with browser integration configured out of the box.
-
-<br>
-
-🎮 **Game-Ready**<br>
-Native Steam, Wine-staging, Gamemode, and every lib32 dependency pre-installed.<br>
-Kernel tweaks for esync/fsync. Zero setup to start playing.
-
-<br>
-
-✈️ **Fully Offline Install**<br>
-Every package is on the ISO. No internet connection needed during installation.<br>
-Boot it, run the installer, reboot into a complete system.
-
-<br>
-
-⚡ **Zen Kernel**<br>
-Linux Zen with BORE scheduler and full preemption.<br>
-Lower input latency, fewer frame drops, smoother multitasking.
-
-<br>
-
-🖥️ **Minimal KDE**<br>
-Plasma Desktop with only Dolphin, Konsole, Spectacle, and Ark.<br>
-No bloat. No PIM suite. No office suite. Yay preinstalled.
-
-<br>
-
-🛡️ **LUKS Encryption**<br>
-Optional full-disk encryption offered during install.<br>
-Btrfs with subvolumes or ext4. Zram swap by default.
-
-<br>
-
-| `0` Flatpaks | `0` Snaps | `yay` AUR Helper | `micro` Default Editor |
-|:---:|:---:|:---:|:---:|
-
-<br>
-
----
-
-<br>
-
-## 📦 Pre-installed Software
-
-<br>
-
-### 🔐 Privacy & Security
-
-| Package | Description |
-|:---:|:---:|
-| Mullvad Browser | Privacy browser + KeePassXC extension |
-| Tor Browser | Anonymous browsing |
-| KeePassXC | Offline password manager |
-| Mullvad VPN | VPN client, daemon auto-enabled |
-| Signal Desktop | Encrypted messaging |
-
-<br>
-
-### 🎮 Gaming
-
-| Package | Description |
-|:---:|:---:|
-| Steam | Native package, auto-launches |
-| Wine Staging | Windows compatibility layer |
-| Gamemode | Gaming performance optimiser |
-
-<br>
-
-### 🎵 Media & Documents
-
-| Package | Description |
-|:---:|:---:|
-| mpv | Video player |
-| Strawberry | Music player |
-| qimgv | Image viewer |
-| LazPaint | Image editor |
-| Zathura | PDF viewer (mupdf backend) |
-| Obsidian | Markdown knowledge base |
-
-<br>
-
-### 🔧 Utilities
-
-| Package | Description |
-|:---:|:---:|
-| qBittorrent | Torrent client |
-| micro | Terminal text editor (default `$EDITOR`) |
-| Ark | Archive manager + Dolphin integration |
-| yay | AUR helper |
-
-<br>
-
-### 🖥️ Desktop
-
-| Package | Description |
-|:---:|:---:|
-| KDE Plasma | Minimal install |
-| Dolphin | File manager |
-| Konsole | Terminal emulator |
-| Spectacle | Screenshot tool |
-
-<br>
-
----
-
-<br>
-
-## 🚀 Quick Start
-
-<br>
-
-> [!TIP]
-> No internet connection is required during installation. Everything is on the ISO.
-
-<br>
-
-```bash
-# Write ISO to USB (replace /dev/sdX)
-sudo dd if=mulch-2025.07.iso of=/dev/sdX bs=4M status=progress
-
-# Boot the USB, then run:
-install-system
-```
-
-```
-╔══════════════════════════════════════════════╗
-║       Welcome to Mulch Linux Installer       ║
-║                                              ║
-║       No internet connection required.       ║
-╚══════════════════════════════════════════════╝
-```
-
-The guided TUI installer handles partitioning, encryption, drivers, and everything else.
-
-<br>
-
----
-
-<br>
-
-## 🏗️ Building the ISO
-
-<br>
-
-> [!IMPORTANT]
-> Requires a working Arch Linux system with `archiso` installed.
-
-<br>
+Requires a working Arch Linux system with `archiso` installed.
 
 ```bash
 # 1 — Install archiso
@@ -200,61 +39,28 @@ sudo ./build.sh
 
 The final ISO appears in `out/`.
 
-<br>
+## Installing
 
----
+Boot the ISO. At the shell prompt run:
 
-<br>
+```bash
+install-system
+```
 
-## 🖥️ GPU Support
+Follow the guided TUI installer. No internet connection is required.
 
-<br>
+## GPU Support
 
-The installer auto-detects your GPU and offers the appropriate drivers:
+The installer auto-detects your GPU and offers:
+- NVIDIA (nvidia-dkms, proprietary)
+- AMD (mesa, open-source)
+- Intel (mesa, open-source)
 
-<br>
+## Gaming Optimisations Included
 
-| GPU | Driver | Type |
-|:---:|:---:|:---:|
-| NVIDIA | `nvidia-dkms` | Proprietary |
-| AMD | `mesa` | Open-source |
-| Intel | `mesa` | Open-source |
-
-<br>
-
----
-
-<br>
-
-## ⚙️ Gaming Optimisations
-
-<br>
-
-| Optimisation | Detail |
-|:---:|:---:|
-| `vm.max_map_count` | Raised to `2147483642` |
-| File descriptor limits | Raised for esync/fsync |
-| Gamemode | Pre-installed and configured |
-| Wine Staging | Full dependency set included |
-| Steam | Native package (no Flatpak) |
-| Steam auto-launch | Launches minimised to tray on login |
-
-<br>
-
----
-
-<br>
-
-## 📄 License
-
-This project is licensed under the terms found in [`LICENSE`](LICENSE).
-
-Built on [Arch Linux](https://archlinux.org). Not affiliated with Arch Linux or any included project.
-
-<br>
-
-**[⬆ Back to top](#mulch-linux)**
-
-<br>
-
-</div>
+- vm.max_map_count raised to 2147483642
+- File descriptor limits raised for esync/fsync
+- Gamemode
+- Wine-staging + dependencies
+- Native Steam (no Flatpak)
+- Steam auto-launches on login (minimised to tray)

@@ -17,8 +17,6 @@ A fully offline Arch Linux installer with KDE Plasma, gaming support, and a cura
 | Graphics       | LazPaint                                       |
 | Editor         | micro (default $EDITOR)                        |
 | AUR Helper     | yay                                            |
-|----------------|------------------------------------------------|
-
 ## Building the ISO
 
 Requires a working Arch Linux system with `archiso` installed.

@@ -1,0 +1,8 @@
+work/
+out/
+pkg-cache/
+aur-repo/
+/tmp/
+*.iso
+*.qcow2
+profile/airootfs/opt/offline-repo/

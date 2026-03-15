@@ -1,0 +1,10 @@
+[Unit]
+Description=Generate locales
+ConditionPathExists=!/usr/lib/locale/locale-archive
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/locale-gen
+
+[Install]
+WantedBy=multi-user.target

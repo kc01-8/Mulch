@@ -1,0 +1,8 @@
+NAME="Mulch Linux"
+PRETTY_NAME="Mulch Linux"
+ID=mulch
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="0;35"
+HOME_URL="https://github.com/kc01-8/Mulch"
+LOGO=mulch

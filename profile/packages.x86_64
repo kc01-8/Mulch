@@ -12,6 +12,7 @@ mkinitcpio
 grub
 efibootmgr
 os-prober
+syslinux
 
 # filesystem / disk
 btrfs-progs
@@ -49,7 +50,7 @@ xorg-xrandr
 xorg-xdpyinfo
 
 # NVIDIA
-nvidia-dkms
+nvidia-open-dkms
 nvidia-utils
 lib32-nvidia-utils
 nvidia-settings
@@ -61,10 +62,6 @@ mesa
 lib32-mesa
 vulkan-radeon
 lib32-vulkan-radeon
-libva-mesa-driver
-lib32-libva-mesa-driver
-mesa-vdpau
-lib32-mesa-vdpau
 xf86-video-amdgpu
 
 # Intel
@@ -95,7 +92,6 @@ kde-gtk-config
 breeze-gtk
 breeze
 xdg-desktop-portal-kde
-kwallet-pam
 polkit-kde-agent
 
 # editor
@@ -108,10 +104,13 @@ man-db
 man-pages
 htop
 unzip
+7zip
 unrar
-p7zip
 rsync
 tmux
+
+# communication
+signal-desktop
 
 # media
 mpv
@@ -143,7 +142,6 @@ lib32-libpulse
 lib32-openal
 lib32-libxcomposite
 lib32-libxinerama
-lib32-sdl2
 lib32-libgcrypt
 lib32-gnutls
 lib32-libxslt
@@ -170,6 +168,37 @@ dkms
 pacman-contrib
 dialog
 
+# cpu microcode
+intel-ucode
+amd-ucode
+
 # live ISO only
 arch-install-scripts
+mkinitcpio-archiso
 memtest86+
+syslinux
+
+# deps needed by AUR packages and mpv
+libva
+libxkbcommon
+rubberband
+opencv
+qt6-base
+qt6-imageformats
+qt6-multimedia
+qt6-svg
+desktop-file-utils
+hicolor-icon-theme
+shared-mime-info
+
+# console font
+terminus-font
+
+# AUR packages (from custom repo)
+yay-bin
+mullvad-vpn-bin
+mullvad-browser-bin
+tor-browser-bin
+obsidian-bin
+qimgv-git
+lazpaint-git

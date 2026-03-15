@@ -1,0 +1,27 @@
+#!/bin/bash
+[ "$(whoami)" = "root" ] && exit 0
+
+sleep 20
+
+RCFILE="$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
+[ ! -f "$RCFILE" ] && exit 0
+
+CONTAINMENT=$(grep -B3 "plugin=org.kde.plasma.icontasks" "$RCFILE" | grep -oP 'Containments\]\[\K[0-9]+' | head -1)
+APPLET=$(grep -B1 "plugin=org.kde.plasma.icontasks" "$RCFILE" | grep -oP 'Applets\]\[\K[0-9]+' | head -1)
+
+[ -z "$CONTAINMENT" ] || [ -z "$APPLET" ] && exit 0
+
+LAUNCHERS="applications:mullvad-browser.desktop,applications:mullvad-vpn.desktop,applications:org.keepassxc.KeePassXC.desktop,applications:steam.desktop,applications:org.strawberrymusicplayer.strawberry.desktop,applications:signal.desktop,applications:lazpaint.desktop,applications:obsidian.desktop,applications:org.kde.konsole.desktop,applications:systemsettings.desktop"
+
+kwriteconfig6 --file "$RCFILE" \
+    --group "Containments" --group "$CONTAINMENT" \
+    --group "Applets" --group "$APPLET" \
+    --group "Configuration" --group "General" \
+    --key "launchers" "$LAUNCHERS"
+
+sed -i '/org.kde.discover/d' "$RCFILE"
+
+qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.refreshCurrentShell 2>/dev/null || \
+    (kquitapp6 plasmashell 2>/dev/null; sleep 2; kstart plasmashell 2>/dev/null &)
+
+rm -f "$HOME/.config/autostart/mulch-taskbar.desktop"

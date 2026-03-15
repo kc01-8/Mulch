@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Install Mulch Linux
+Comment=Launch the Mulch Linux installer
+Exec=konsole -e /usr/local/bin/install-system
+Icon=system-software-install
+Terminal=false
+Categories=System;

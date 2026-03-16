@@ -3,6 +3,7 @@
 <div align="center">
 
 # Mulch Linux
+https://mulchlinux.org
 
 A fully offline Arch Linux installer with KDE Plasma, gaming support, and a curated set of applications.
 

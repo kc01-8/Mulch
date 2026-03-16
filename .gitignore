@@ -2,7 +2,12 @@ work/
 out/
 pkg-cache/
 aur-repo/
-/tmp/
 *.iso
 *.qcow2
 profile/airootfs/opt/offline-repo/
+profile/airootfs/opt/kernel-repo/
+/tmp/
+*.log
+*.pkg.tar.zst
+*.pkg.tar.xz
+*.db.tar.gz

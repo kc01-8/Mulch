@@ -6,7 +6,6 @@ PROFILE_DIR="${SCRIPT_DIR}/profile"
 WORK_DIR="${SCRIPT_DIR}/work"
 OUT_DIR="${SCRIPT_DIR}/out"
 AUR_REPO="${SCRIPT_DIR}/aur-repo"
-PKG_CACHE="${SCRIPT_DIR}/pkg-cache"
 CUSTOM_REPO="/tmp/mulch-custom-repo"
 
 die() { echo "FATAL: $*" >&2; exit 1; }
@@ -35,114 +34,29 @@ fi
 msg "Syncing package databases…"
 pacman -Sy
 
-# ── read package list ────────────────────────────────────────────
-mapfile -t PKGLIST < <(grep -v '^#\|^$' "${PROFILE_DIR}/packages.x86_64")
-EXTRA_PKGS=(intel-ucode amd-ucode)
-
-# ── download official packages with empty db to get all deps ─────
-msg "Downloading all official packages + dependencies…"
-mkdir -p "$PKG_CACHE"
-
-FAKE_DB="/tmp/pacman-fake-db"
-rm -rf "$FAKE_DB"
-mkdir -p "$FAKE_DB/local"
-
-cat > /tmp/pacman-download.conf <<DLEOF
-[options]
-HoldPkg     = pacman glibc
-Architecture = x86_64
-SigLevel    = Required DatabaseOptional
-LocalFileSigLevel = Optional
-
-[core]
-Include = /etc/pacman.d/mirrorlist
-
-[extra]
-Include = /etc/pacman.d/mirrorlist
-
-[multilib]
-Include = /etc/pacman.d/mirrorlist
-DLEOF
-
-pacman -Sy --config /tmp/pacman-download.conf --dbpath "$FAKE_DB" --noconfirm 2>&1 | tail -3
-
-# filter to only official packages (skip AUR names)
-AUR_NAMES=(yay-bin mullvad-vpn-bin mullvad-browser-bin tor-browser-bin obsidian-bin qimgv-git lazpaint-git)
-OFFICIAL_PKGS=()
-for pkg in "${PKGLIST[@]}" "${EXTRA_PKGS[@]}"; do
-    skip=false
-    for aur in "${AUR_NAMES[@]}"; do
-        [[ "$pkg" == "$aur" ]] && skip=true && break
-    done
-    if [[ "$skip" == false ]]; then
-        if pacman -Si "$pkg" --config /tmp/pacman-download.conf --dbpath "$FAKE_DB" &>/dev/null; then
-            OFFICIAL_PKGS+=("$pkg")
-        else
-            warn "Package not in repos: ${pkg}"
-        fi
-    fi
-done
-
-msg "Downloading ${#OFFICIAL_PKGS[@]} official packages + all deps…"
-pacman -Syw --noconfirm \
-    --config /tmp/pacman-download.conf \
-    --dbpath "$FAKE_DB" \
-    --cachedir "$PKG_CACHE" \
-    "${OFFICIAL_PKGS[@]}" 2>&1 | tail -10
-
-rm -rf "$FAKE_DB" /tmp/pacman-download.conf
-
-# ── download AUR package dependencies ────────────────────────────
-msg "Downloading AUR package dependencies…"
-for aurpkg in "$AUR_REPO"/*.pkg.tar.zst; do
-    [[ -f "$aurpkg" ]] || continue
-    [[ "$aurpkg" == *-debug-* ]] && continue
-
-    pkgname=$(basename "$aurpkg" | sed 's/-[0-9].*//')
-
-    deps=$(tar xf "$aurpkg" .PKGINFO -O 2>/dev/null \
-        | grep "^depend = " \
-        | sed 's/^depend = //' \
-        | sed 's/[>=<].*//' \
-        | sort -u) || true
-
-    missing_deps=()
-    for dep in $deps; do
-        if find "$PKG_CACHE" -name "${dep}-[0-9]*.pkg.tar.*" ! -name "*.sig" 2>/dev/null | grep -q .; then
-            continue
-        fi
-        if find "$AUR_REPO" -name "${dep}-[0-9]*.pkg.tar.*" 2>/dev/null | grep -q .; then
-            continue
-        fi
-        if pacman -Si "$dep" &>/dev/null; then
-            missing_deps+=("$dep")
-        fi
-    done
-
-    if [[ ${#missing_deps[@]} -gt 0 ]]; then
-        msg "  ${pkgname}: downloading ${#missing_deps[@]} deps…"
-        pacman -Syw --noconfirm --cachedir "$PKG_CACHE" "${missing_deps[@]}" >> /tmp/download.log 2>&1 || true
-    fi
-done
-
-total_official=$(find "$PKG_CACHE" -name "*.pkg.tar.*" ! -name "*.sig" | wc -l)
-total_aur=$(find "$AUR_REPO" -name "*.pkg.tar.*" ! -name "*.sig" | wc -l)
-msg "Downloaded: ${total_official} official + ${total_aur} AUR = $((total_official + total_aur)) total"
-
-# ── set up custom repo for mkarchiso (AUR packages) ─────────────
-msg "Setting up custom repo for live ISO build…"
+# ── set up custom repo (AUR packages) ───────────────────────────
+msg "Setting up custom repo…"
 rm -rf "$CUSTOM_REPO"
 mkdir -p "$CUSTOM_REPO"
 
 # copy AUR packages (skip debug)
 find "$AUR_REPO" -name "*.pkg.tar.zst" ! -name "*-debug-*" -exec cp {} "$CUSTOM_REPO"/ \;
 
-# build repo database once
+# download alternate kernels for installer choice
+msg "Downloading alternate kernels…"
+pacman -Sw --noconfirm --cachedir "$CUSTOM_REPO" \
+    linux linux-headers \
+    linux-lts linux-lts-headers 2>&1 | tail -5
+
+# build repo database
 msg "Building custom repo database…"
 rm -f "$CUSTOM_REPO"/custom.db* "$CUSTOM_REPO"/custom.files*
-repo-add "$CUSTOM_REPO/custom.db.tar.gz" "$CUSTOM_REPO"/*.pkg.tar.zst 2>/dev/null
+repo-add "$CUSTOM_REPO/custom.db.tar.gz" "$CUSTOM_REPO"/*.pkg.tar.zst 2>/dev/null || true
 
-# replace symlinks with real files
+# also add any .pkg.tar.xz files (kernels may be .xz)
+find "$CUSTOM_REPO" -name "*.pkg.tar.xz" -exec repo-add "$CUSTOM_REPO/custom.db.tar.gz" {} \; 2>/dev/null || true
+
+# fix symlinks
 for f in "$CUSTOM_REPO"/custom.db "$CUSTOM_REPO"/custom.files; do
     if [[ -L "$f" ]]; then
         _target=$(readlink -f "$f")
@@ -151,22 +65,28 @@ for f in "$CUSTOM_REPO"/custom.db "$CUSTOM_REPO"/custom.files; do
     fi
 done
 
-msg "Custom repo: $(find "$CUSTOM_REPO" -name '*.pkg.tar.zst' | wc -l) packages"
+msg "Custom repo: $(find "$CUSTOM_REPO" -name '*.pkg.tar.*' ! -name '*.sig' | wc -l) packages"
 
-# ── also prepare offline repo for the installer ──────────────────
-ISO_REPO="${PROFILE_DIR}/airootfs/opt/offline-repo"
-rm -rf "$ISO_REPO"
-mkdir -p "$ISO_REPO"
+# ── place alternate kernel repo inside ISO ───────────────────────
+msg "Placing kernel repo in ISO tree…"
+KERNEL_REPO="${PROFILE_DIR}/airootfs/opt/kernel-repo"
+rm -rf "$KERNEL_REPO"
+mkdir -p "$KERNEL_REPO"
 
-msg "Copying all packages into offline repo for installer…"
-find "$PKG_CACHE" -name "*.pkg.tar.*" ! -name "*.sig" -exec cp {} "$ISO_REPO"/ \;
-find "$CUSTOM_REPO" -name "*.pkg.tar.zst" -exec cp {} "$ISO_REPO"/ \;
+# only copy kernel packages (not AUR — those are already installed via mkarchiso)
+for kpkg in linux-[0-9]* linux-headers-[0-9]* linux-lts-[0-9]* linux-lts-headers-[0-9]*; do
+    [[ -f "$CUSTOM_REPO/$kpkg" ]] && cp "$CUSTOM_REPO/$kpkg" "$KERNEL_REPO"/
+done
+# safer glob approach
+find "$CUSTOM_REPO" -name "linux-[0-9]*.pkg.tar.*" -exec cp {} "$KERNEL_REPO"/ \;
+find "$CUSTOM_REPO" -name "linux-headers-*.pkg.tar.*" -exec cp {} "$KERNEL_REPO"/ \;
+find "$CUSTOM_REPO" -name "linux-lts-*.pkg.tar.*" -exec cp {} "$KERNEL_REPO"/ \;
+find "$CUSTOM_REPO" -name "linux-lts-headers-*.pkg.tar.*" -exec cp {} "$KERNEL_REPO"/ \;
 
-msg "Building offline repo database…"
-find "$ISO_REPO" -name "*.pkg.tar.*" -print0 \
-    | xargs -0 repo-add -q "$ISO_REPO/mulch.db.tar.gz" 2>/dev/null || true
+# build kernel repo database
+repo-add "$KERNEL_REPO/kernels.db.tar.gz" "$KERNEL_REPO"/*.pkg.tar.* 2>/dev/null || true
 
-for f in "$ISO_REPO"/mulch.db "$ISO_REPO"/mulch.files; do
+for f in "$KERNEL_REPO"/kernels.db "$KERNEL_REPO"/kernels.files; do
     if [[ -L "$f" ]]; then
         _target=$(readlink -f "$f")
         rm "$f"
@@ -174,8 +94,10 @@ for f in "$ISO_REPO"/mulch.db "$ISO_REPO"/mulch.files; do
     fi
 done
 
-pkg_in_repo=$(find "$ISO_REPO" -name "*.pkg.tar.*" ! -name "*.sig" | wc -l)
-msg "Offline repo: ${pkg_in_repo} packages"
+msg "Kernel repo: $(find "$KERNEL_REPO" -name '*.pkg.tar.*' ! -name '*.sig' | wc -l) packages"
+
+# ── remove old offline repo if it exists ─────────────────────────
+rm -rf "${PROFILE_DIR}/airootfs/opt/offline-repo"
 
 # ── build ISO ────────────────────────────────────────────────────
 msg "Building ISO (this takes a while)…"

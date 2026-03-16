@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
+#  Mulch Linux Copy Based Offline Installer
 set -uo pipefail
 
-INSTALLER_VERSION="1.0"
+INSTALLER_VERSION="2.0"
 LOG="/tmp/installer.log"
 MOUNT="/mnt"
-OFFLINE_REPO="/opt/offline-repo"
-EXT_DIR="/root/target-configs/extensions"
+KERNEL_REPO="/opt/kernel-repo"
 
 SEL_KEYMAP="us"
 SEL_DISK=""
@@ -34,7 +34,6 @@ msg()  { echo -e "${G}==>${N} $*"; }
 warn() { echo -e "${Y}==> WARNING:${N} $*"; }
 err()  { echo -e "${R}==> ERROR:${N} $*"; }
 log()  { echo "[$(date '+%H:%M:%S')] $*" >> "$LOG"; }
-
 
 detect_uefi() {
     [[ -d /sys/firmware/efi/efivars ]] && IS_UEFI=1 || IS_UEFI=0
@@ -89,6 +88,8 @@ _menu() {
     local mh="$1"; shift
     _dialog --title "$title" --menu "$text" "$h" "$w" "$mh" "$@"
 }
+
+#  TUI STAGES
 
 stage_welcome() {
     _msgbox "Welcome" \
@@ -181,7 +182,7 @@ stage_swap() {
 
 stage_hostname() {
     SEL_HOSTNAME=$(_inputbox "Hostname" "Enter hostname:" 10 50 "mulch") \
-        || SEL_HOSTNAME="mulchlinux"
+        || SEL_HOSTNAME="mulch"
 }
 
 stage_user() {
@@ -294,6 +295,8 @@ Proceed with installation?" 22 55 \
         || { _msgbox "Cancelled" "Installation cancelled." 8 40; exit 0; }
 }
 
+#  INSTALLATION ROUTINES
+
 do_partition() {
     log "Partitioning ${SEL_DISK}"
     wipefs -af "$SEL_DISK" >> "$LOG" 2>&1
@@ -394,11 +397,135 @@ do_mount() {
         swapon "$PART_SWAP"
     fi
 
-    # verify mount worked
     if ! mountpoint -q "$MOUNT"; then
-        die_install "Failed to mount root filesystem"
+        err "Failed to mount root filesystem"
+        exit 1
     fi
     log "Root mounted successfully at ${MOUNT}"
+}
+
+do_copy_system() {
+    log "Copying live system to disk"
+
+    rsync -aAXH --info=progress2 \
+        --exclude='/dev/*' \
+        --exclude='/proc/*' \
+        --exclude='/sys/*' \
+        --exclude='/tmp/*' \
+        --exclude='/run/*' \
+        --exclude='/mnt/*' \
+        --exclude='/lost+found' \
+        --exclude='/opt/kernel-repo' \
+        --exclude='/root/installer.sh' \
+        --exclude='/root/Desktop' \
+        --exclude='/root/target-configs' \
+        --exclude='/root/.config/plasma-org.kde.plasma.desktop-appletsrc' \
+        --exclude='/root/.config/autostart' \
+        --exclude='/etc/systemd/system/getty@tty1.service.d' \
+        --exclude='/etc/systemd/system/graphical.target.wants/sddm.service' \
+        --exclude='/etc/systemd/system/multi-user.target.wants/NetworkManager.service' \
+        --exclude='/etc/sddm.conf.d/autologin.conf' \
+        --exclude='/etc/mkinitcpio.conf' \
+        --exclude='/etc/motd' \
+        --exclude='/etc/issue' \
+        --exclude='/etc/hostname' \
+        --exclude='/etc/hosts' \
+        --exclude='/etc/fstab' \
+        --exclude='/etc/machine-id' \
+        --exclude='/etc/pacman.d/hooks/mulch-panel-layout.hook' \
+        --exclude='/var/log/*' \
+        --exclude='/var/cache/pacman/pkg/*' \
+        --exclude='/var/tmp/*' \
+        --exclude='/usr/local/bin/install-system' \
+        --exclude='/usr/local/bin/start-gui' \
+        / "${MOUNT}/" 2>&1 | tee -a "$LOG"
+
+    if [[ ! -f "${MOUNT}/usr/bin/bash" ]]; then
+        err "rsync failed — /usr/bin/bash missing on target"
+        exit 1
+    fi
+
+    log "System copy complete"
+}
+
+do_cleanup_live() {
+    log "Cleaning up live-ISO artifacts"
+
+    # remove archiso-specific packages
+    arch-chroot "$MOUNT" pacman -Rns --noconfirm mkinitcpio-archiso 2>> "$LOG" || true
+    arch-chroot "$MOUNT" pacman -Rns --noconfirm arch-install-scripts 2>> "$LOG" || true
+
+    # remove live-only files that slipped through
+    rm -f "${MOUNT}/etc/systemd/system/systemd-firstboot.service" 2>/dev/null
+    rm -rf "${MOUNT}/etc/systemd/system/systemd-firstboot.service.d" 2>/dev/null
+    rm -f "${MOUNT}/etc/systemd/system/locale-gen.service" 2>/dev/null
+    rm -f "${MOUNT}/usr/local/bin/mulch-taskbar-setup" 2>/dev/null
+    rm -rf "${MOUNT}/etc/sddm.conf.d" 2>/dev/null
+
+    # clear machine-id so systemd generates a new one on first boot
+    echo "" > "${MOUNT}/etc/machine-id"
+
+    # clean pacman database of [custom] repo references
+    rm -rf "${MOUNT}/var/lib/pacman/sync/custom.db" 2>/dev/null
+
+    # clean logs and cache
+    rm -rf "${MOUNT}/var/log/"* 2>/dev/null
+    rm -rf "${MOUNT}/var/cache/pacman/pkg/"* 2>/dev/null
+
+    log "Live artifacts cleaned"
+}
+
+do_handle_kernel() {
+    log "Handling kernel selection: ${SEL_KERNEL}"
+
+    if [[ "$SEL_KERNEL" == "linux-zen" ]]; then
+        # already installed in the live system, nothing to do
+        log "linux-zen already installed"
+        return
+    fi
+
+    # need to install alternate kernel from the kernel repo
+    if [[ ! -d "$KERNEL_REPO" ]]; then
+        log "WARNING: Kernel repo not found at ${KERNEL_REPO}, keeping linux-zen"
+        warn "Alternate kernel repo not found. Keeping linux-zen."
+        SEL_KERNEL="linux-zen"
+        return
+    fi
+
+    local kernel_headers="${SEL_KERNEL}-headers"
+
+    # create temp pacman config pointing to kernel repo
+    cat > "${MOUNT}/tmp/pacman-kernel.conf" <<KERNCONF
+[options]
+Architecture = x86_64
+SigLevel = Never
+
+[kernels]
+SigLevel = Never
+Server = file:///opt/kernel-repo
+KERNCONF
+
+    # copy kernel repo into chroot
+    mkdir -p "${MOUNT}/opt/kernel-repo"
+    cp "$KERNEL_REPO"/* "${MOUNT}/opt/kernel-repo/" 2>/dev/null || true
+
+    # install the chosen kernel
+    msg "  Installing ${SEL_KERNEL}…"
+    arch-chroot "$MOUNT" pacman --config /tmp/pacman-kernel.conf \
+        -Sy --noconfirm "$SEL_KERNEL" "$kernel_headers" >> "$LOG" 2>&1
+
+    if [[ $? -ne 0 ]]; then
+        warn "Failed to install ${SEL_KERNEL}. Keeping linux-zen."
+        SEL_KERNEL="linux-zen"
+    else
+        msg "  ✓ ${SEL_KERNEL} installed"
+    fi
+
+    # cleanup
+    rm -rf "${MOUNT}/opt/kernel-repo"
+    rm -f "${MOUNT}/tmp/pacman-kernel.conf"
+
+    log "Kernel handling complete: using ${SEL_KERNEL}"
 }
 
 do_fstab() {
@@ -409,25 +536,31 @@ do_fstab() {
 do_configure() {
     log "Configuring system"
 
-    # verify chroot works before proceeding
     if ! arch-chroot "$MOUNT" /bin/true >> "$LOG" 2>&1; then
-        die_install "arch-chroot failed. The base system may not be installed correctly."
+        err "arch-chroot failed"
+        exit 1
     fi
 
+    # timezone
     arch-chroot "$MOUNT" ln -sf "/usr/share/zoneinfo/${SEL_TIMEZONE}" /etc/localtime
     arch-chroot "$MOUNT" hwclock --systohc
 
-    sed -i "s/^#${SEL_LOCALE}/${SEL_LOCALE}/" "${MOUNT}/etc/locale.gen"
-    sed -i 's/^#en_US.UTF-8/en_US.UTF-8/' "${MOUNT}/etc/locale.gen"
+    # locale
+    # write locale.gen fresh (rsync'd version may be wrong)
+    echo "${SEL_LOCALE} UTF-8" > "${MOUNT}/etc/locale.gen"
+    echo "en_US.UTF-8 UTF-8" >> "${MOUNT}/etc/locale.gen"
+    
+    # remove stale locale archive so locale-gen rebuilds it
+    rm -f "${MOUNT}/usr/lib/locale/locale-archive" 2>/dev/null
+    
     arch-chroot "$MOUNT" locale-gen >> "$LOG" 2>&1
     echo "LANG=${SEL_LOCALE}" > "${MOUNT}/etc/locale.conf"
 
+    # keymap + console font
     echo "KEYMAP=${SEL_KEYMAP}" > "${MOUNT}/etc/vconsole.conf"
-
-    echo "KEYMAP=${SEL_KEYMAP}" > "${MOUNT}/etc/vconsole.conf"
-    # set a console font to suppress mkinitcpio warning
     echo "FONT=ter-v16b" >> "${MOUNT}/etc/vconsole.conf"
 
+    # hostname
     echo "$SEL_HOSTNAME" > "${MOUNT}/etc/hostname"
     cat > "${MOUNT}/etc/hosts" <<EOF
 127.0.0.1   localhost
@@ -435,6 +568,19 @@ do_configure() {
 127.0.1.1   ${SEL_HOSTNAME}.localdomain ${SEL_HOSTNAME}
 EOF
 
+    # os-release
+    cat > "${MOUNT}/etc/os-release" <<'OSREL'
+NAME="Mulch Linux"
+PRETTY_NAME="Mulch Linux"
+ID=mulch
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="0;35"
+HOME_URL="https://github.com/kc01-8/Mulch"
+LOGO=mulch
+OSREL
+
+    # pacman.conf with real repos
     cat > "${MOUNT}/etc/pacman.conf" <<'PACCONF'
 [options]
 HoldPkg     = pacman glibc
@@ -454,12 +600,9 @@ Include = /etc/pacman.d/mirrorlist
 Include = /etc/pacman.d/mirrorlist
 PACCONF
 
-    # set up mirrorlist
+    # mirrorlist
     cat > "${MOUNT}/etc/pacman.d/mirrorlist" <<'MIRRORLIST'
-## Worldwide
 Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
-
-## Generated — run 'sudo reflector --latest 20 --sort rate --save /etc/pacman.d/mirrorlist' to update
 Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch
 Server = https://mirrors.kernel.org/archlinux/$repo/os/$arch
 Server = https://mirror.leaseweb.net/archlinux/$repo/os/$arch
@@ -467,23 +610,25 @@ Server = https://archlinux.mirror.liteserver.nl/$repo/os/$arch
 Server = https://mirror.f4st.host/archlinux/$repo/os/$arch
 MIRRORLIST
 
+    # mkinitcpio
     local hooks="base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck"
     if [[ "$SEL_ENCRYPT" == "yes" ]]; then
         hooks="base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt filesystems fsck"
     fi
-    sed -i "s|^HOOKS=.*|HOOKS=(${hooks})|" "${MOUNT}/etc/mkinitcpio.conf"
+
+    cat > "${MOUNT}/etc/mkinitcpio.conf" <<MKINIT
+MODULES=()
+BINARIES=()
+FILES=()
+HOOKS=(${hooks})
+MKINIT
 
     if [[ "$SEL_GPU" == "nvidia" ]]; then
         sed -i 's/^MODULES=(.*)/MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)/' \
             "${MOUNT}/etc/mkinitcpio.conf"
     fi
 
-    # suppress missing firmware warnings for unused modules
-    mkdir -p "${MOUNT}/etc/modprobe.d"
-    echo "blacklist qat_6xxx" > "${MOUNT}/etc/modprobe.d/no-qat.conf"
-
-    arch-chroot "$MOUNT" mkinitcpio -P >> "$LOG" 2>&1
-
+    # users
     echo "root:${SEL_ROOT_PASS}" | arch-chroot "$MOUNT" chpasswd
     arch-chroot "$MOUNT" useradd -m -G wheel,video,audio,input,gamemode \
         -s /bin/bash "$SEL_USERNAME"
@@ -491,6 +636,7 @@ MIRRORLIST
     sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' \
         "${MOUNT}/etc/sudoers"
 
+    # services
     arch-chroot "$MOUNT" systemctl enable sddm          >> "$LOG" 2>&1
     arch-chroot "$MOUNT" systemctl enable NetworkManager >> "$LOG" 2>&1
     arch-chroot "$MOUNT" systemctl enable bluetooth      >> "$LOG" 2>&1
@@ -504,8 +650,85 @@ MIRRORLIST
     log "System configured successfully"
 }
 
+do_install_kernel() {
+    log "Installing kernel to boot partition"
+
+    # find the correct vmlinuz for the selected kernel
+    case "$SEL_KERNEL" in
+        linux-zen)
+            local kdir=$(find "${MOUNT}/usr/lib/modules" -maxdepth 1 -name "*zen*" -type d | head -1)
+            local kname="vmlinuz-linux-zen"
+            ;;
+        linux)
+            local kdir=$(find "${MOUNT}/usr/lib/modules" -maxdepth 1 -name "*arch*" ! -name "*zen*" ! -name "*lts*" -type d | head -1)
+            local kname="vmlinuz-linux"
+            ;;
+        linux-lts)
+            local kdir=$(find "${MOUNT}/usr/lib/modules" -maxdepth 1 -name "*lts*" -type d | head -1)
+            local kname="vmlinuz-linux-lts"
+            ;;
+    esac
+
+    if [[ -n "$kdir" && -f "${kdir}/vmlinuz" ]]; then
+        cp "${kdir}/vmlinuz" "${MOUNT}/boot/${kname}"
+        msg "  ✓ Copied ${kname}"
+    else
+        warn "  ✗ Could not find vmlinuz for ${SEL_KERNEL}"
+        log "Module dirs:"
+        ls -la "${MOUNT}/usr/lib/modules/" >> "$LOG" 2>&1
+    fi
+
+    # microcode - copy from live ISO boot files
+    local iso_boot="/run/archiso/bootmnt/arch/boot/x86_64"
+    if [[ -f "${iso_boot}/amd-ucode.img" ]]; then
+        cp "${iso_boot}/amd-ucode.img" "${MOUNT}/boot/"
+        msg "  ✓ Copied amd-ucode.img"
+    fi
+    if [[ -f "${iso_boot}/intel-ucode.img" ]]; then
+        cp "${iso_boot}/intel-ucode.img" "${MOUNT}/boot/"
+        msg "  ✓ Copied intel-ucode.img"
+    fi
+
+    # generate initramfs
+    msg "  Generating initramfs…"
+    arch-chroot "$MOUNT" mkinitcpio -p "$SEL_KERNEL" >> "$LOG" 2>&1
+
+    # verify
+    log "Contents of ${MOUNT}/boot/:"
+    ls -la "${MOUNT}/boot/" >> "$LOG" 2>&1
+
+    if [[ -f "${MOUNT}/boot/${kname}" ]]; then
+        msg "  ✓ Kernel in place"
+    else
+        warn "  ✗ Kernel missing from /boot"
+    fi
+
+    if ls "${MOUNT}/boot/initramfs-${SEL_KERNEL}"* &>/dev/null; then
+        msg "  ✓ Initramfs generated"
+    else
+        warn "  ✗ Initramfs missing"
+    fi
+
+    log "Kernel installation complete"
+}
+
+
 do_bootloader() {
     log "Installing bootloader"
+
+    # grub branding
+    sed -i 's/^GRUB_DISTRIBUTOR=.*/GRUB_DISTRIBUTOR="Mulch"/' "${MOUNT}/etc/default/grub"
+    if ! grep -q '^GRUB_DISTRIBUTOR' "${MOUNT}/etc/default/grub"; then
+        echo 'GRUB_DISTRIBUTOR="Mulch"' >> "${MOUNT}/etc/default/grub"
+    fi
+
+    cat >> "${MOUNT}/etc/default/grub" <<'GRUBEXTRA'
+GRUB_COLOR_NORMAL="white/black"
+GRUB_COLOR_HIGHLIGHT="magenta/black"
+GRUB_TIMEOUT_STYLE=menu
+GRUB_TIMEOUT=5
+GRUB_DISABLE_OS_PROBER=false
+GRUBEXTRA
 
     local grub_cmdline=""
 
@@ -525,25 +748,10 @@ do_bootloader() {
         grub_cmdline+=" nvidia_drm.modeset=1"
     fi
 
-    sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3 quiet ${grub_cmdline}\"|" \
+    sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3 quiet\"|" \
         "${MOUNT}/etc/default/grub"
     sed -i "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"${grub_cmdline}\"|" \
         "${MOUNT}/etc/default/grub"
-
-    # branding
-    sed -i 's/^GRUB_DISTRIBUTOR=.*/GRUB_DISTRIBUTOR="Mulch"/' "${MOUNT}/etc/default/grub"
-    # if GRUB_DISTRIBUTOR doesn't exist, add it
-    if ! grep -q '^GRUB_DISTRIBUTOR' "${MOUNT}/etc/default/grub"; then
-        echo 'GRUB_DISTRIBUTOR="Mulch"' >> "${MOUNT}/etc/default/grub"
-    fi
-
-    # purple theme colors
-    cat >> "${MOUNT}/etc/default/grub" <<'GRUBCOLORS'
-GRUB_COLOR_NORMAL="white/black"
-GRUB_COLOR_HIGHLIGHT="magenta/black"
-GRUB_TIMEOUT_STYLE=menu
-GRUB_TIMEOUT=5
-GRUBCOLORS
 
     if [[ $IS_UEFI -eq 1 ]]; then
         arch-chroot "$MOUNT" grub-install --target=x86_64-efi \
@@ -551,10 +759,6 @@ GRUBCOLORS
     else
         arch-chroot "$MOUNT" grub-install --target=i386-pc "$SEL_DISK" >> "$LOG" 2>&1
     fi
-	
-    # enable os-prober to suppress warning (harmless on fresh install)
-    echo "GRUB_DISABLE_OS_PROBER=false" >> "${MOUNT}/etc/default/grub"
-	
     arch-chroot "$MOUNT" grub-mkconfig -o /boot/grub/grub.cfg >> "$LOG" 2>&1
 
     log "Bootloader installed"
@@ -625,6 +829,7 @@ do_user_config() {
     log "Setting up user configuration"
     local home="${MOUNT}/home/${SEL_USERNAME}"
 
+    # editor defaults
     mkdir -p "${MOUNT}/etc/profile.d"
     cat > "${MOUNT}/etc/profile.d/custom-defaults.sh" <<'EOF'
 export EDITOR=micro
@@ -632,6 +837,7 @@ export VISUAL=micro
 export MICRO_TRUECOLOR=1
 EOF
 
+    # micro config
     mkdir -p "${home}/.config/micro"
     cat > "${home}/.config/micro/settings.json" <<'EOF'
 {
@@ -645,6 +851,7 @@ EOF
 }
 EOF
 
+    # steam autostart
     mkdir -p "${home}/.config/autostart"
     cat > "${home}/.config/autostart/steam.desktop" <<'EOF'
 [Desktop Entry]
@@ -658,6 +865,7 @@ X-KDE-autostart-phase=2
 StartupNotify=false
 EOF
 
+    # zathura config
     mkdir -p "${home}/.config/zathura"
     cat > "${home}/.config/zathura/zathurarc" <<'EOF'
 set selection-clipboard clipboard
@@ -673,6 +881,7 @@ set recolor-lightcolor "#1e1e2e"
 set recolor-darkcolor "#cdd6f4"
 EOF
 
+    # mpv config
     mkdir -p "${home}/.config/mpv"
     cat > "${home}/.config/mpv/mpv.conf" <<'EOF'
 profile=gpu-hq
@@ -702,8 +911,9 @@ EOF
 
     mkdir -p "${mb_dist_dir}/extensions"
 
-    if [[ -f "${EXT_DIR}/keepassxc-browser@keepassxc.org.xpi" ]]; then
-        cp "${EXT_DIR}/keepassxc-browser@keepassxc.org.xpi" "${mb_dist_dir}/extensions/"
+    local ext_dir="/root/target-configs/extensions"
+    if [[ -f "${ext_dir}/keepassxc-browser@keepassxc.org.xpi" ]]; then
+        cp "${ext_dir}/keepassxc-browser@keepassxc.org.xpi" "${mb_dist_dir}/extensions/"
     fi
 
     cat > "${mb_dist_dir}/policies.json" <<'EOF'
@@ -719,6 +929,7 @@ EOF
 }
 EOF
 
+    # file associations
     mkdir -p "${home}/.config"
     cat > "${home}/.config/mimeapps.list" <<'EOF'
 [Default Applications]
@@ -740,37 +951,88 @@ audio/x-wav=strawberry.desktop
 text/plain=micro.desktop
 EOF
 
-    # ── taskbar setup (first login) ──────────────────────────────
     cat > "${MOUNT}/usr/local/bin/mulch-taskbar-setup" <<'TASKBAR'
 #!/bin/bash
-# only run for real users, not root (live ISO)
-[ "$(whoami)" = "root" ] && exit 0
+exec > /tmp/mulch-taskbar.log 2>&1
+echo "$(date): script started as $(whoami)"
 
-sleep 20
+[ "$(whoami)" = "root" ] && echo "root user, exiting" && exit 0
+
+export PATH="/usr/bin:/usr/local/bin:$PATH"
+
+echo "$(date): sleeping 10s"
+sleep 10
 
 RCFILE="$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
-[ ! -f "$RCFILE" ] && exit 0
+echo "$(date): checking $RCFILE"
 
-CONTAINMENT=$(grep -B3 "plugin=org.kde.plasma.icontasks" "$RCFILE" | grep -oP 'Containments\]\[\K[0-9]+' | head -1)
-APPLET=$(grep -B1 "plugin=org.kde.plasma.icontasks" "$RCFILE" | grep -oP 'Applets\]\[\K[0-9]+' | head -1)
+if [ ! -f "$RCFILE" ]; then
+    echo "$(date): rcfile not found, exiting"
+    exit 0
+fi
 
-[ -z "$CONTAINMENT" ] || [ -z "$APPLET" ] && exit 0
+echo "$(date): rcfile found, size $(wc -c < "$RCFILE")"
+echo "$(date): contents:"
+cat "$RCFILE"
+echo ""
+echo "$(date): looking for icontasks"
 
-LAUNCHERS="applications:mullvad-browser.desktop,applications:mullvad-vpn.desktop,applications:org.keepassxc.KeePassXC.desktop,applications:steam.desktop,applications:org.strawberrymusicplayer.strawberry.desktop,applications:signal.desktop,applications:lazpaint.desktop,applications:obsidian.desktop,applications:org.kde.konsole.desktop,applications:systemsettings.desktop"
+# find containment and applet numbers using basic grep
+APPLET_LINE=$(grep -n "plugin=org.kde.plasma.icontasks" "$RCFILE" | head -1)
+echo "$(date): applet line: $APPLET_LINE"
 
-kwriteconfig6 --file "$RCFILE" \
-    --group "Containments" --group "$CONTAINMENT" \
-    --group "Applets" --group "$APPLET" \
-    --group "Configuration" --group "General" \
-    --key "launchers" "$LAUNCHERS"
+if [ -z "$APPLET_LINE" ]; then
+    echo "$(date): icontasks not found, exiting"
+    exit 0
+fi
 
+APPLET_LINENUM=$(echo "$APPLET_LINE" | cut -d: -f1)
+
+# read backwards from that line to find the section header
+SECTION=$(head -n "$APPLET_LINENUM" "$RCFILE" | grep '^\[Containments\]' | tail -1)
+echo "$(date): section: $SECTION"
+
+# extract containment and applet numbers
+CONTAINMENT=$(echo "$SECTION" | sed 's/.*Containments\]\[//' | sed 's/\].*//')
+APPLET=$(echo "$SECTION" | sed 's/.*Applets\]\[//' | sed 's/\].*//')
+
+echo "$(date): containment=$CONTAINMENT applet=$APPLET"
+
+if [ -z "$CONTAINMENT" ] || [ -z "$APPLET" ]; then
+    echo "$(date): could not parse numbers, trying kwriteconfig6 directly"
+fi
+
+LAUNCHERS="applications:steam.desktop,applications:mullvad-browser.desktop,applications:mullvad-vpn.desktop,applications:org.kde.dolphin.desktop,applications:org.kde.konsole.desktop,applications:org.keepassxc.KeePassXC.desktop,applications:mpv.desktop,applications:org.strawberrymusicplayer.strawberry.desktop,applications:signal.desktop,applications:micro.desktop,applications:obsidian.desktop,applications:lazpaint.desktop,applications:org.qbittorrent.qBittorrent.desktop,applications:systemsettings.desktop"
+# method 1: direct sed into config file
+GENERAL_SECTION="[Containments][${CONTAINMENT}][Applets][${APPLET}][Configuration][General]"
+
+echo "$(date): checking if section exists: $GENERAL_SECTION"
+
+if grep -qF "$GENERAL_SECTION" "$RCFILE"; then
+    echo "$(date): section exists, adding launchers after it"
+    sed -i "/${GENERAL_SECTION//[/\\[}/a launchers=${LAUNCHERS}" "$RCFILE"
+else
+    echo "$(date): section does not exist, appending"
+    echo "" >> "$RCFILE"
+    echo "$GENERAL_SECTION" >> "$RCFILE"
+    echo "launchers=${LAUNCHERS}" >> "$RCFILE"
+fi
+
+# remove discover
 sed -i '/org.kde.discover/d' "$RCFILE"
 
-qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.refreshCurrentShell 2>/dev/null || \
-    dbus-send --session --dest=org.kde.plasmashell --type=method_call /PlasmaShell org.kde.PlasmaShell.refreshCurrentShell 2>/dev/null || \
-    (kquitapp6 plasmashell 2>/dev/null; sleep 2; kstart plasmashell 2>/dev/null &)
+echo "$(date): verifying"
+grep "launchers" "$RCFILE"
 
+echo "$(date): restarting plasmashell"
+kquitapp6 plasmashell 2>/dev/null
+sleep 3
+kstart plasmashell 2>/dev/null &
+
+sleep 5
+echo "$(date): done, removing autostart"
 rm -f "$HOME/.config/autostart/mulch-taskbar.desktop"
+echo "$(date): finished"
 TASKBAR
 
     chmod +x "${MOUNT}/usr/local/bin/mulch-taskbar-setup"
@@ -784,8 +1046,7 @@ X-KDE-autostart-phase=2
 NoDisplay=true
 EOF
 
-    msg "  ✓ Taskbar setup script installed"
-
+    # fix ownership
     arch-chroot "$MOUNT" chown -R "${SEL_USERNAME}:${SEL_USERNAME}" \
         "/home/${SEL_USERNAME}" >> "$LOG" 2>&1
 
@@ -795,22 +1056,19 @@ EOF
 do_cleanup() {
     log "Final cleanup"
 
-    # remove flatpak if somehow present
+    # remove flatpak if present
     arch-chroot "$MOUNT" pacman -Rns --noconfirm flatpak 2>/dev/null || true
 
-    # clear package cache non-interactively
+    # clear package cache
     rm -rf "${MOUNT}/var/cache/pacman/pkg/"* 2>/dev/null || true
-    log "Package cache cleared"
 
-    # sync databases now that mirrorlist exists
+    # sync databases
     arch-chroot "$MOUNT" pacman -Sy --noconfirm >> "$LOG" 2>&1 || true
 
-    # verify yay works
+    # verify yay
     if [[ -f "${MOUNT}/usr/bin/yay" ]]; then
         arch-chroot "$MOUNT" su - "${SEL_USERNAME}" -c "yay --version" >> "$LOG" 2>&1 || true
         msg "  ✓ yay available"
-    else
-        warn "  yay not installed"
     fi
 
     sync
@@ -824,24 +1082,7 @@ do_unmount() {
     [[ "$SEL_ENCRYPT" == "yes" ]] && cryptsetup close "$LUKS_NAME" 2>/dev/null || true
 }
 
-run_step() {
-    local pct="$1"
-    local desc="$2"
-    local func="$3"
-
-    echo "$pct" > /tmp/install-progress
-    echo "$desc" > /tmp/install-step
-
-    log "=== ${desc} ==="
-
-    if ! $func >> "$LOG" 2>&1; then
-        echo "FAILED: ${desc}" > /tmp/install-failed
-        log "FAILED: ${desc}"
-        return 1
-    fi
-
-    return 0
-}
+#  MAIN
 
 main() {
     if [[ $EUID -ne 0 ]]; then
@@ -850,12 +1091,12 @@ main() {
     fi
 
     : > "$LOG"
-    rm -f /tmp/install-failed /tmp/install-progress /tmp/install-step
     log "Installer started"
 
     detect_uefi
     log "UEFI=$IS_UEFI"
 
+    # ── TUI stages ───────────────────────────────────────────────
     stage_welcome
     stage_keymap
     stage_disk
@@ -871,257 +1112,37 @@ main() {
     stage_kernel
     stage_summary
 
-    # ── run installation steps directly (no subshell) ────────────
+    # ── installation ─────────────────────────────────────────────
     clear
     echo ""
     echo "  Installing Mulch Linux…"
     echo "  Logs: ${LOG}"
     echo ""
 
-    run_step 5  "Partitioning disk..."       do_partition  || true
-    run_step 10 "Setting up encryption..."   do_encrypt    || true
-    run_step 15 "Formatting partitions..."   do_format     || true
-    run_step 18 "Mounting filesystems..."    do_mount
+    echo "  [5%] Partitioning disk…"
+    do_partition >> "$LOG" 2>&1
 
-    if [[ -f /tmp/install-failed ]]; then
-        err "$(cat /tmp/install-failed)"
-        err "Check log: $LOG"
-        echo ""
-        echo "Press Enter to view log, or Ctrl+C to exit."
-        read -r
-        less "$LOG"
-        exit 1
-    fi
+    echo "  [10%] Setting up encryption…"
+    do_encrypt >> "$LOG" 2>&1
+
+    echo "  [15%] Formatting partitions…"
+    do_format >> "$LOG" 2>&1
+
+    echo "  [18%] Mounting filesystems…"
+    do_mount >> "$LOG" 2>&1
 
     echo ""
-    echo "  [20%] Installing packages (this is the slow part)…"
-    echo "  This can take 5-15 minutes depending on disk speed."
+    echo "  [20%] Copying system to disk (this takes 2-5 minutes)…"
     echo ""
+    do_copy_system
 
-    # run pacstrap directly so we can see output
-    log "=== Installing packages ==="
+    echo ""
+    echo "  [60%] Cleaning live-ISO artifacts…"
+    do_cleanup_live >> "$LOG" 2>&1
 
-    # verify offline repo first
-    if [[ ! -d "$OFFLINE_REPO" ]]; then
-        err "Offline repo not found at ${OFFLINE_REPO}"
-        log "ls /opt/:"
-        ls -la /opt/ >> "$LOG" 2>&1
-        echo ""
-        echo "Press Enter to view log."
-        read -r
-        less "$LOG"
-        exit 1
-    fi
+    echo "  [65%] Handling kernel selection…"
+    do_handle_kernel >> "$LOG" 2>&1
 
-    if [[ ! -f "$OFFLINE_REPO/mulch.db" ]]; then
-        err "mulch.db not found"
-        log "Contents of ${OFFLINE_REPO}:"
-        ls -la "$OFFLINE_REPO"/ >> "$LOG" 2>&1
-        echo ""
-        echo "Press Enter to view log."
-        read -r
-        less "$LOG"
-        exit 1
-    fi
-
-    local pkg_count
-    pkg_count=$(find "$OFFLINE_REPO" -name "*.pkg.tar.*" ! -name "*.sig" | wc -l)
-    msg "Found ${pkg_count} packages in offline repo"
-
-    # write pacman config
-    cat > /tmp/pacman-offline.conf <<EOF
-[options]
-HoldPkg     = pacman glibc
-Architecture = x86_64
-SigLevel    = Never
-ParallelDownloads = 5
-
-[mulch]
-SigLevel = Never
-Server = file://${OFFLINE_REPO}
-EOF
-
-    # test it
-    msg "Testing offline repo access…"
-    mkdir -p /tmp/pacman-test-db
-    if ! pacman -Sy --config /tmp/pacman-offline.conf --dbpath /tmp/pacman-test-db 2>&1 | tee -a "$LOG"; then
-        err "pacman cannot read offline repo"
-        rm -rf /tmp/pacman-test-db
-        echo "Press Enter to view log."
-        read -r
-        less "$LOG"
-        exit 1
-    fi
-
-    local db_count
-    db_count=$(pacman -Sl mulch --config /tmp/pacman-offline.conf --dbpath /tmp/pacman-test-db 2>/dev/null | wc -l)
-    msg "Database has ${db_count} entries"
-    rm -rf /tmp/pacman-test-db
-
-    # build package list
-    local cpu_ucode=""
-    case "$(detect_cpu)" in
-        amd)   cpu_ucode="amd-ucode" ;;
-        intel) cpu_ucode="intel-ucode" ;;
-    esac
-
-    local kernel_headers="${SEL_KERNEL}-headers"
-
-    local -a pkgs=(
-        base base-devel "$SEL_KERNEL" "$kernel_headers" linux-firmware
-        mkinitcpio
-        grub efibootmgr os-prober
-        btrfs-progs dosfstools e2fsprogs ntfs-3g exfatprogs
-        networkmanager iwd openssh wget curl reflector dhcpcd
-        pipewire pipewire-alsa pipewire-pulse pipewire-jack wireplumber
-        bluez bluez-utils
-        xorg-server xorg-xinit xorg-xrandr
-        vulkan-icd-loader lib32-vulkan-icd-loader vulkan-tools
-        dkms cryptsetup lvm2
-        ufw zram-generator pacman-contrib
-        git bash-completion man-db man-pages htop
-        unzip unrar rsync tmux dialog terminus-font
-    )
-
-    [[ -n "$cpu_ucode" ]] && pkgs+=("$cpu_ucode")
-
-    case "$SEL_GPU" in
-        nvidia)
-            pkgs+=(
-                nvidia-open-dkms nvidia-utils lib32-nvidia-utils
-                nvidia-settings opencl-nvidia lib32-opencl-nvidia
-            )
-            ;;
-        amd)
-            pkgs+=(
-                mesa lib32-mesa
-                vulkan-radeon lib32-vulkan-radeon
-                xf86-video-amdgpu
-            )
-            ;;
-        intel)
-            pkgs+=(
-                mesa lib32-mesa
-                vulkan-intel lib32-vulkan-intel intel-media-driver
-            )
-            ;;
-    esac
-
-    pkgs+=(
-        plasma-desktop sddm sddm-kcm
-        dolphin konsole spectacle ark
-        plasma-pa plasma-nm plasma-systemmonitor
-        kscreen powerdevil bluedevil
-        kde-gtk-config breeze-gtk breeze
-        xdg-desktop-portal-kde polkit-kde-agent
-    )
-
-    pkgs+=(
-        micro
-        mpv strawberry qbittorrent keepassxc
-        zathura zathura-pdf-mupdf
-        signal-desktop
-    )
-
-    pkgs+=(
-        steam
-        wine-staging wine-mono wine-gecko winetricks
-        gamemode lib32-gamemode
-        vkd3d lib32-vkd3d
-        lib32-gst-plugins-base lib32-gst-plugins-good
-        lib32-libpulse lib32-openal
-        lib32-libxcomposite lib32-libxinerama
-        lib32-libgcrypt lib32-gnutls
-        lib32-libxslt lib32-libva lib32-gtk3
-        lib32-libcups lib32-ocl-icd
-    )
-
-    pkgs+=(
-        ttf-liberation lib32-fontconfig
-        noto-fonts noto-fonts-cjk noto-fonts-emoji
-    )
-
-    msg "Installing ${#pkgs[@]} packages via pacstrap…"
-
-    # pacstrap with --noconfirm doesn't handle provider selection well
-    # pre-answer by setting the provider explicitly based on GPU choice
-    case "$SEL_GPU" in
-        nvidia) pkgs+=(nvidia-utils lib32-nvidia-utils) ;;
-        amd)    pkgs+=(vulkan-radeon lib32-vulkan-radeon) ;;
-        intel)  pkgs+=(vulkan-intel lib32-vulkan-intel) ;;
-        *)      pkgs+=(vulkan-radeon lib32-vulkan-radeon) ;;
-    esac
-
-    # run pacstrap
-    if ! pacstrap -C /tmp/pacman-offline.conf "$MOUNT" "${pkgs[@]}" 2>&1 | tee -a "$LOG"; then
-        err "pacstrap failed"
-        echo ""
-        echo "Press Enter to view log."
-        read -r
-        less "$LOG"
-        exit 1
-    fi
-
-    # verify base install
-    if [[ ! -f "${MOUNT}/usr/bin/bash" ]]; then
-        err "pacstrap ran but /usr/bin/bash is missing"
-        echo "Press Enter to view log."
-        read -r
-        less "$LOG"
-        exit 1
-    fi
-
-    msg "Base packages installed successfully"
-
-    msg "Installing AUR packages…"
-
-    # mount offline repo into chroot so pacman can resolve deps
-    mkdir -p "${MOUNT}/opt/offline-repo"
-    mount --bind "$OFFLINE_REPO" "${MOUNT}/opt/offline-repo"
-
-    # create temp pacman config in chroot pointing to offline repo
-    cat > "${MOUNT}/etc/pacman-aur.conf" <<'AURCONF'
-[options]
-Architecture = x86_64
-SigLevel = Never
-
-[mulch]
-SigLevel = Never
-Server = file:///opt/offline-repo
-AURCONF
-
-    # sync database inside chroot
-    arch-chroot "$MOUNT" pacman --config /etc/pacman-aur.conf -Sy >> "$LOG" 2>&1
-
-    AUR_PKGS=(
-        yay-bin
-        mullvad-vpn-bin
-        mullvad-browser-bin
-        tor-browser-bin
-        obsidian-bin
-        qimgv-git
-        lazpaint-git
-    )
-
-    for aurpkg in "${AUR_PKGS[@]}"; do
-        echo "  Installing ${aurpkg}…"
-        if arch-chroot "$MOUNT" pacman --config /etc/pacman-aur.conf -S --noconfirm "$aurpkg" >> "$LOG" 2>&1; then
-            msg "  ✓ ${aurpkg}"
-        elif arch-chroot "$MOUNT" pacman --config /etc/pacman-aur.conf -Sdd --noconfirm "$aurpkg" >> "$LOG" 2>&1; then
-            msg "  ✓ ${aurpkg} (skipped broken deps)"
-        else
-            warn "  ✗ ${aurpkg} failed"
-        fi
-    done
-
-    # cleanup
-    umount "${MOUNT}/opt/offline-repo" 2>/dev/null || true
-    rmdir "${MOUNT}/opt/offline-repo" 2>/dev/null || true
-    rm -f "${MOUNT}/etc/pacman-aur.conf"
-
-    msg "AUR packages done"
-
-    # ── remaining steps ──────────────────────────────────────────
     echo "  [70%] Generating fstab…"
     do_fstab >> "$LOG" 2>&1
 
@@ -1133,6 +1154,9 @@ AURCONF
         less "$LOG"
         exit 1
     fi
+
+    echo "  [78%] Installing kernel to boot…"
+    do_install_kernel
 
     echo "  [82%] Installing bootloader…"
     if ! do_bootloader >> "$LOG" 2>&1; then
@@ -1155,8 +1179,12 @@ AURCONF
     echo "  [100%] Done!"
     echo ""
 
-    if grep -qi "error\|failed" "$LOG" 2>/dev/null; then
-        echo "  Some warnings were logged."
+    # check for real errors
+    real_errors=$(grep -ciE "FATAL|ERROR:.*Failed to install|rsync failed" "$LOG" 2>/dev/null || true)
+    real_errors=${real_errors:-0}
+    real_errors=$((real_errors + 0))
+    if [[ $real_errors -gt 0 ]]; then
+        echo "  ⚠ ${real_errors} error(s) detected in log."
         echo "  Press Enter to view log, or type 'skip' to continue."
         read -r answer
         if [[ "$answer" != "skip" ]]; then

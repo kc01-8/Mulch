@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Mullvad VPN
+Exec=mullvad-vpn
+Icon=mullvad-vpn
+X-KDE-autostart-phase=2
+NoDisplay=true

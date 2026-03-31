@@ -62,7 +62,7 @@ Follow the guided TUI installer. No internet connection is required.
 | Communication  | Signal Desktop                                 |
 | Gaming         | Steam (native), Wine, Gamemode                 |
 | Torrents       | qBittorrent                                    |
-| Graphics       | LazPaint                                       |
+| Screenshots    | Spectacle                                      |
 | Editor         | micro (default $EDITOR)                        |
 | AUR Helper     | yay                                            |
 

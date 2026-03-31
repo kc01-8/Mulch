@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Mulch Welcome
+Exec=bash -c 'sleep 3 && /usr/local/bin/mulch-welcome'
+X-KDE-autostart-phase=2
+NoDisplay=true

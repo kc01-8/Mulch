@@ -1,0 +1,7 @@
+[Mouse]
+XLbInptAccelProfileFlat=true
+XLbInptPointerAcceleration=0
+cursorTheme=Oxygen_Zion
+
+[Libinput][*][*]
+PointerAccelerationProfile=1

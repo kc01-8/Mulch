@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="${SCRIPT_DIR}/aur-repo"
-BUILD_DIR="/tmp/aur-build"
+BUILD_DIR="$(mktemp -d /var/tmp/aur-build.XXXXXX)"
 BUILD_USER="aurbuilder"
 
 AUR_PACKAGES=(
@@ -14,7 +14,6 @@ AUR_PACKAGES=(
     tor-browser-bin
     obsidian-bin
     qimgv-git
-    lazpaint-git
 )
 
 KEYSERVERS=(
@@ -28,6 +27,14 @@ die()  { echo "FATAL: $*" >&2; exit 1; }
 msg()  { echo "==> $*"; }
 warn() { echo "==> WARNING: $*"; }
 
+cleanup() {
+    msg "Cleaning up build environment…"
+    rm -rf "$BUILD_DIR"
+    userdel -r "$BUILD_USER" 2>/dev/null || true
+    rm -f "/etc/sudoers.d/${BUILD_USER}"
+}
+trap cleanup EXIT
+
 [[ $EUID -eq 0 ]] || die "Run as root"
 pacman -Sy --needed --noconfirm base-devel git pacman-contrib
 
@@ -35,7 +42,7 @@ pacman -Sy --needed --noconfirm base-devel git pacman-contrib
 if ! id "$BUILD_USER" &>/dev/null; then
     useradd -m "$BUILD_USER"
 fi
-echo "${BUILD_USER} ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/${BUILD_USER}"
+echo "${BUILD_USER} ALL=(ALL) NOPASSWD: /usr/bin/pacman, /usr/bin/makepkg" > "/etc/sudoers.d/${BUILD_USER}"
 
 mkdir -p "$REPO_DIR" "$BUILD_DIR"
 chown "$BUILD_USER":"$BUILD_USER" "$BUILD_DIR"
@@ -107,8 +114,6 @@ fix_pkgbuild() {
 # ── install common build deps upfront ────────────────────────────
 msg "Installing common build dependencies…"
 pacman -S --needed --noconfirm \
-    lazarus \
-    fpc \
     qt6-base qt6-svg qt6-imageformats qt6-multimedia \
     opencv \
     cmake \
@@ -175,7 +180,4 @@ echo ""
 echo "  Packages built:"
 find "$REPO_DIR" -name "*.pkg.tar.zst" -printf "    %f\n" | sort
 
-# ── cleanup ──────────────────────────────────────────────────────
-rm -rf "$BUILD_DIR"
-userdel -r "$BUILD_USER" 2>/dev/null || true
-rm -f "/etc/sudoers.d/${BUILD_USER}"
+# cleanup handled by EXIT trap

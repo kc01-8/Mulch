@@ -2,7 +2,7 @@
 #  Mulch Linux Copy Based Offline Installer
 set -uo pipefail
 
-INSTALLER_VERSION="2.0"
+INSTALLER_VERSION="3.0"
 LOG="/tmp/installer.log"
 MOUNT="/mnt"
 KERNEL_REPO="/opt/kernel-repo"
@@ -27,10 +27,49 @@ PART_BOOT=""
 PART_ROOT=""
 PART_SWAP=""
 LUKS_NAME="cryptroot"
-BACKTITLE="Mulch Linux Installer v${INSTALLER_VERSION}"
+BACKTITLE="Mulch Linux Installer"
 
-R='\033[0;31m'; G='\033[0;32m'; Y='\033[1;33m'; N='\033[0m'
-msg()  { echo -e "${G}==>${N} $*"; }
+# dialog color scheme (purple background, orange text)
+export DIALOGRC=/tmp/dialogrc
+cat > /tmp/dialogrc <<'DIALOGRC'
+use_shadow = OFF
+use_colors = ON
+
+screen_color = (WHITE,MAGENTA,ON)
+shadow_color = (BLACK,BLACK,ON)
+dialog_color = (YELLOW,MAGENTA,ON)
+title_color = (YELLOW,MAGENTA,ON)
+border_color = (WHITE,MAGENTA,ON)
+button_active_color = (BLACK,YELLOW,ON)
+button_inactive_color = (WHITE,MAGENTA,ON)
+button_key_active_color = (BLACK,YELLOW,ON)
+button_key_inactive_color = (YELLOW,MAGENTA,ON)
+button_label_active_color = (BLACK,YELLOW,ON)
+button_label_inactive_color = (WHITE,MAGENTA,ON)
+inputbox_color = (BLACK,WHITE,ON)
+inputbox_border_color = (MAGENTA,WHITE,ON)
+searchbox_color = (BLACK,WHITE,ON)
+searchbox_title_color = (YELLOW,WHITE,ON)
+searchbox_border_color = (MAGENTA,WHITE,ON)
+position_indicator_color = (YELLOW,MAGENTA,ON)
+menubox_color = (BLACK,MAGENTA,ON)
+menubox_border_color = (WHITE,MAGENTA,ON)
+item_color = (WHITE,MAGENTA,OFF)
+item_selected_color = (BLACK,YELLOW,ON)
+tag_color = (YELLOW,MAGENTA,ON)
+tag_selected_color = (BLACK,YELLOW,ON)
+tag_key_color = (YELLOW,MAGENTA,ON)
+tag_key_selected_color = (BLACK,YELLOW,ON)
+check_color = (WHITE,MAGENTA,ON)
+check_selected_color = (BLACK,YELLOW,ON)
+uarrow_color = (YELLOW,MAGENTA,ON)
+darrow_color = (YELLOW,MAGENTA,ON)
+gauge_color = (YELLOW,MAGENTA,ON)
+border2_color = (YELLOW,MAGENTA,ON)
+DIALOGRC
+
+R='\033[0;31m'; G='\033[0;35m'; Y='\033[1;33m'; O='\033[38;5;208m'; P='\033[45m'; N='\033[0m'
+msg()  { echo -e "${O}==>${N} $*"; }
 warn() { echo -e "${Y}==> WARNING:${N} $*"; }
 err()  { echo -e "${R}==> ERROR:${N} $*"; }
 log()  { echo "[$(date '+%H:%M:%S')] $*" >> "$LOG"; }
@@ -183,14 +222,30 @@ stage_swap() {
 stage_hostname() {
     SEL_HOSTNAME=$(_inputbox "Hostname" "Enter hostname:" 10 50 "mulch") \
         || SEL_HOSTNAME="mulch"
+    if [[ ! "$SEL_HOSTNAME" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$ ]]; then
+        _msgbox "Error" "Invalid hostname. Use only letters, numbers, and hyphens.\nMust start and end with a letter or number." 10 50
+        stage_hostname; return
+    fi
 }
 
 stage_user() {
+    local reserved="root bin daemon mail ftp http nobody dbus systemd-journal-remote systemd-network systemd-oom systemd-resolve systemd-timesync systemd-coredump uuidd polkitd tss usbmux avahi colord git rtkit sddm live"
+
     SEL_USERNAME=$(_inputbox "User Account" "Enter username:" 10 50 "") || true
     while [[ -z "$SEL_USERNAME" ]]; do
         _msgbox "Error" "Username cannot be empty." 8 40
         SEL_USERNAME=$(_inputbox "User Account" "Enter username:" 10 50 "") || true
     done
+
+    if [[ ! "$SEL_USERNAME" =~ ^[a-z_][a-z0-9_-]{0,30}$ ]]; then
+        _msgbox "Error" "Invalid username. Use lowercase letters, numbers,\nhyphens, and underscores. Must start with a letter." 10 55
+        stage_user; return
+    fi
+
+    if echo " $reserved " | grep -q " $SEL_USERNAME "; then
+        _msgbox "Error" "'${SEL_USERNAME}' is a reserved system name." 8 50
+        stage_user; return
+    fi
 
     SEL_USER_PASS=$(_passwordbox "User Password" \
         "Enter password for ${SEL_USERNAME}:" 10 50)
@@ -219,14 +274,21 @@ stage_root_pass() {
 
 stage_timezone() {
     local region city
-    region=$(_menu "Timezone" "Select region:" 20 50 12 \
-        America  "" \
-        Europe   "" \
-        Asia     "" \
-        Africa   "" \
-        Australia "" \
-        Pacific  "" \
-    ) || region="America"
+
+    # dynamically list all timezone regions
+    local -a regions=()
+    while IFS= read -r r; do
+        regions+=("$r" "")
+    done < <(find /usr/share/zoneinfo -mindepth 1 -maxdepth 1 -type d \
+        ! -name posix ! -name right ! -name Etc \
+        -printf '%f\n' | sort)
+
+    # fallback if find fails
+    if [[ ${#regions[@]} -eq 0 ]]; then
+        regions=(America "" Europe "" Asia "" Africa "" Australia "" Pacific "")
+    fi
+
+    region=$(_menu "Timezone" "Select region:" 20 50 12 "${regions[@]}") || region="America"
 
     local -a cities=()
     while IFS= read -r c; do
@@ -328,8 +390,9 @@ do_partition() {
 
     partprobe "$SEL_DISK" 2>/dev/null; sleep 2
 
+    # devices that use 'p' separator before partition number
     local p=""
-    [[ "$SEL_DISK" == *nvme* || "$SEL_DISK" == *mmcblk* ]] && p="p"
+    [[ "$SEL_DISK" == *nvme* || "$SEL_DISK" == *mmcblk* || "$SEL_DISK" == *loop* || "$SEL_DISK" == *nbd* ]] && p="p"
 
     PART_BOOT="${SEL_DISK}${p}1"
     if [[ "$SEL_SWAP" == "partition" ]]; then
@@ -438,6 +501,7 @@ do_copy_system() {
         --exclude='/var/tmp/*' \
         --exclude='/usr/local/bin/install-system' \
         --exclude='/usr/local/bin/start-gui' \
+        --exclude='/home/live' \
         / "${MOUNT}/" 2>&1 | tee -a "$LOG"
 
     if [[ ! -f "${MOUNT}/usr/bin/bash" ]]; then
@@ -462,15 +526,32 @@ do_cleanup_live() {
     rm -f "${MOUNT}/usr/local/bin/mulch-taskbar-setup" 2>/dev/null
     rm -rf "${MOUNT}/etc/sddm.conf.d" 2>/dev/null
 
+    # remove steam autostart from skel (Steam should be launched manually)
+    rm -f "${MOUNT}/etc/skel/.config/autostart/steam.desktop" 2>/dev/null
+    rm -f "${MOUNT}/etc/skel/.config/autostart/steam-cleanup.desktop" 2>/dev/null
+
     # clear machine-id so systemd generates a new one on first boot
     echo "" > "${MOUNT}/etc/machine-id"
 
-    # clean pacman database of [custom] repo references
-    rm -rf "${MOUNT}/var/lib/pacman/sync/custom.db" 2>/dev/null
+    # clear ALL stale pacman sync databases — the installed system must do a
+    # fresh sync on first boot since the ISO databases are from build time
+    rm -rf "${MOUNT}/var/lib/pacman/sync/"*.db 2>/dev/null
+    rm -rf "${MOUNT}/var/lib/pacman/sync/"*.files 2>/dev/null
 
     # clean logs and cache
     rm -rf "${MOUNT}/var/log/"* 2>/dev/null
     rm -rf "${MOUNT}/var/cache/pacman/pkg/"* 2>/dev/null
+
+    # remove live user
+    arch-chroot "$MOUNT" userdel -r live 2>> "$LOG" || true
+    rm -rf "${MOUNT}/home/live" 2>/dev/null
+    rm -f "${MOUNT}/etc/sudoers.d/live" 2>/dev/null
+    
+    # restore clean passwd/shadow/group (installer will recreate properly)
+    sed -i '/^live:/d' "${MOUNT}/etc/passwd"
+    sed -i '/^live:/d' "${MOUNT}/etc/shadow"  
+    sed -i '/^live:/d' "${MOUNT}/etc/group"
+    sed -i 's/,live//g' "${MOUNT}/etc/group"
 
     log "Live artifacts cleaned"
 }
@@ -511,14 +592,12 @@ KERNCONF
 
     # install the chosen kernel
     msg "  Installing ${SEL_KERNEL}…"
-    arch-chroot "$MOUNT" pacman --config /tmp/pacman-kernel.conf \
-        -Sy --noconfirm "$SEL_KERNEL" "$kernel_headers" >> "$LOG" 2>&1
-
-    if [[ $? -ne 0 ]]; then
+    if arch-chroot "$MOUNT" pacman --config /tmp/pacman-kernel.conf \
+        -Sy --noconfirm "$SEL_KERNEL" "$kernel_headers" >> "$LOG" 2>&1; then
+        msg "  ✓ ${SEL_KERNEL} installed"
+    else
         warn "Failed to install ${SEL_KERNEL}. Keeping linux-zen."
         SEL_KERNEL="linux-zen"
-    else
-        msg "  ✓ ${SEL_KERNEL} installed"
     fi
 
     # cleanup
@@ -576,7 +655,7 @@ ID=mulch
 ID_LIKE=arch
 BUILD_ID=rolling
 ANSI_COLOR="0;35"
-HOME_URL="https://github.com/kc01-8/Mulch"
+HOME_URL="https://mulchlinux.org"
 LOGO=mulch
 OSREL
 
@@ -642,9 +721,22 @@ MKINIT
     arch-chroot "$MOUNT" systemctl enable bluetooth      >> "$LOG" 2>&1
     arch-chroot "$MOUNT" systemctl enable fstrim.timer   >> "$LOG" 2>&1
     arch-chroot "$MOUNT" systemctl enable ufw            >> "$LOG" 2>&1
-
+	
+    # initialize pacman keyring — delete the stale live-ISO keyring first,
+    # then create a fresh one so the installed system can verify packages
+    rm -rf "${MOUNT}/etc/pacman.d/gnupg" 2>/dev/null || true
+    arch-chroot "$MOUNT" pacman-key --init >> "$LOG" 2>&1
+    arch-chroot "$MOUNT" pacman-key --populate archlinux >> "$LOG" 2>&1
+	
+    # force enable mullvad daemon
+    ln -sf /usr/lib/systemd/system/mullvad-daemon.service \
+        "${MOUNT}/etc/systemd/system/multi-user.target.wants/mullvad-daemon.service" 2>/dev/null || true
+    log "Mullvad daemon force-enabled"
+	
+	# verify mullvad daemon is enabled
     if [[ -f "${MOUNT}/usr/lib/systemd/system/mullvad-daemon.service" ]]; then
         arch-chroot "$MOUNT" systemctl enable mullvad-daemon >> "$LOG" 2>&1
+        msg "  ✓ Mullvad daemon enabled"
     fi
 
     log "System configured successfully"
@@ -678,16 +770,25 @@ do_install_kernel() {
         ls -la "${MOUNT}/usr/lib/modules/" >> "$LOG" 2>&1
     fi
 
-    # microcode - copy from live ISO boot files
-    local iso_boot="/run/archiso/bootmnt/arch/boot/x86_64"
-    if [[ -f "${iso_boot}/amd-ucode.img" ]]; then
-        cp "${iso_boot}/amd-ucode.img" "${MOUNT}/boot/"
-        msg "  ✓ Copied amd-ucode.img"
-    fi
-    if [[ -f "${iso_boot}/intel-ucode.img" ]]; then
-        cp "${iso_boot}/intel-ucode.img" "${MOUNT}/boot/"
-        msg "  ✓ Copied intel-ucode.img"
-    fi
+    # microcode - copy from live ISO boot files (try multiple paths)
+    local ucode_dirs=(
+        "/run/archiso/bootmnt/arch/boot/x86_64"
+        "/run/archiso/bootmnt/arch/boot"
+        "/boot"
+    )
+    for ucode in amd-ucode.img intel-ucode.img; do
+        if [[ -f "${MOUNT}/boot/${ucode}" ]]; then
+            msg "  ✓ ${ucode} already present"
+            continue
+        fi
+        for dir in "${ucode_dirs[@]}"; do
+            if [[ -f "${dir}/${ucode}" ]]; then
+                cp "${dir}/${ucode}" "${MOUNT}/boot/"
+                msg "  ✓ Copied ${ucode}"
+                break
+            fi
+        done
+    done
 
     # generate initramfs
     msg "  Generating initramfs…"
@@ -734,7 +835,7 @@ GRUBEXTRA
 
     if [[ "$SEL_ENCRYPT" == "yes" ]]; then
         local phys_part p=""
-        [[ "$SEL_DISK" == *nvme* || "$SEL_DISK" == *mmcblk* ]] && p="p"
+        [[ "$SEL_DISK" == *nvme* || "$SEL_DISK" == *mmcblk* || "$SEL_DISK" == *loop* || "$SEL_DISK" == *nbd* ]] && p="p"
         case "$SEL_SWAP" in
             partition) phys_part="${SEL_DISK}${p}3" ;;
             *)         phys_part="${SEL_DISK}${p}2" ;;
@@ -828,8 +929,9 @@ EOF
 do_user_config() {
     log "Setting up user configuration"
     local home="${MOUNT}/home/${SEL_USERNAME}"
+    local config_src="/root/config"
 
-    # editor defaults
+    # ── editor defaults ──────────────────────────────────────────
     mkdir -p "${MOUNT}/etc/profile.d"
     cat > "${MOUNT}/etc/profile.d/custom-defaults.sh" <<'EOF'
 export EDITOR=micro
@@ -837,7 +939,7 @@ export VISUAL=micro
 export MICRO_TRUECOLOR=1
 EOF
 
-    # micro config
+    # ── micro config ─────────────────────────────────────────────
     mkdir -p "${home}/.config/micro"
     cat > "${home}/.config/micro/settings.json" <<'EOF'
 {
@@ -851,21 +953,89 @@ EOF
 }
 EOF
 
-    # steam autostart
-    mkdir -p "${home}/.config/autostart"
-    cat > "${home}/.config/autostart/steam.desktop" <<'EOF'
-[Desktop Entry]
-Type=Application
-Name=Steam
-Comment=Steam gaming platform
-Exec=steam -silent
-Icon=steam
-X-KDE-autostart-after=panel
-X-KDE-autostart-phase=2
-StartupNotify=false
+    # ── KDE color schemes (system-wide) ──────────────────────────
+    mkdir -p "${MOUNT}/usr/share/color-schemes"
+    cp "${config_src}/color-schemes/"*.colors "${MOUNT}/usr/share/color-schemes/" 2>/dev/null || true
+
+    # ── plasmoid widgets (system-wide) ───────────────────────────
+    mkdir -p "${MOUNT}/usr/share/plasma/plasmoids"
+    cp -r "${config_src}/plasma/plasmoids/org.magpie.dotted.separator" \
+        "${MOUNT}/usr/share/plasma/plasmoids/" 2>/dev/null || true
+    cp -r "${config_src}/plasma/plasmoids/weather.widget.plus" \
+        "${MOUNT}/usr/share/plasma/plasmoids/" 2>/dev/null || true
+
+    # ── plasma desktop theme (system-wide) ───────────────────────
+    mkdir -p "${MOUNT}/usr/share/plasma/desktoptheme"
+    cp -r "${config_src}/plasma/desktoptheme/We10XOS-dark" \
+        "${MOUNT}/usr/share/plasma/desktoptheme/" 2>/dev/null || true
+
+    # ── window decoration (system-wide) ──────────────────────────
+    mkdir -p "${MOUNT}/usr/share/aurorae/themes"
+    cp -r "${config_src}/aurorae/themes/Se7enAero" \
+        "${MOUNT}/usr/share/aurorae/themes/" 2>/dev/null || true
+
+    # ── icon theme (system-wide) ─────────────────────────────────
+    mkdir -p "${MOUNT}/usr/share/icons"
+    cp -r "${config_src}/icons/ExposeAir" "${MOUNT}/usr/share/icons/" 2>/dev/null || true
+
+    # ── cursor theme (system-wide) ───────────────────────────────
+    cp -r "${config_src}/cursors/Oxygen_Zion" "${MOUNT}/usr/share/icons/" 2>/dev/null || true
+    # ── KDE globals (colors, theme, style) ───────────────────────
+    mkdir -p "${home}/.config"
+    cp "${config_src}/kdeglobals" "${home}/.config/kdeglobals" 2>/dev/null || true
+
+    # ── kwin config (effects, tiling) ────────────────────────────
+    cp "${config_src}/kwinrc" "${home}/.config/kwinrc" 2>/dev/null || true
+
+    # ── plasma theme ─────────────────────────────────────────────
+    cp "${config_src}/plasmarc" "${home}/.config/plasmarc" 2>/dev/null || true
+
+    # ── konsole ──────────────────────────────────────────────────
+    mkdir -p "${home}/.local/share/konsole"
+    cp "${config_src}/konsole/Aritim Dark.colorscheme" "${home}/.local/share/konsole/" 2>/dev/null || true
+    cp "${config_src}/konsole/Profile 1.profile" "${home}/.local/share/konsole/" 2>/dev/null || true
+    cp "${config_src}/konsolerc" "${home}/.config/konsolerc" 2>/dev/null || true
+
+    # ── dolphin ──────────────────────────────────────────────────
+    cp "${config_src}/dolphinrc" "${home}/.config/dolphinrc" 2>/dev/null || true
+
+    # ── disable KDE Wallet ───────────────────────────────────────
+    cat > "${home}/.config/kwalletrc" <<'EOF'
+[Wallet]
+Enabled=false
+First Use=false
 EOF
 
-    # zathura config
+    # ── disable mouse acceleration ───────────────────────────────
+	cp "${config_src}/kcminputrc" "${home}/.config/kcminputrc" 2>/dev/null || true
+	
+    # ── configure yay (no diff prompts) ──────────────────────────
+    mkdir -p "${home}/.config/yay"
+    cat > "${home}/.config/yay/config.json" <<'EOF'
+{
+    "diffmenu": false,
+    "cleanmenu": false,
+    "removemake": "no",
+    "provides": true,
+    "pgpfetch": true,
+    "cleanAfter": true
+}
+EOF
+
+    # ── bashrc (yay overwrite alias) ─────────────────────────────
+    cat > "${home}/.bashrc" <<'EOF'
+# yay: always allow overwriting conflicting files during upgrades
+alias yay='yay --overwrite "*"'
+EOF
+
+    # ── prevent Steam desktop shortcut ───────────────────────────
+    mkdir -p "${home}/.local/share/Steam"
+    mkdir -p "${home}/.config/autostart"
+    
+    # Steam checks this file to decide whether to create desktop shortcut
+    touch "${home}/.local/share/Steam/.desktop-shortcut-created"
+
+    # ── zathura config ───────────────────────────────────────────
     mkdir -p "${home}/.config/zathura"
     cat > "${home}/.config/zathura/zathurarc" <<'EOF'
 set selection-clipboard clipboard
@@ -881,19 +1051,18 @@ set recolor-lightcolor "#1e1e2e"
 set recolor-darkcolor "#cdd6f4"
 EOF
 
-    # mpv config
+    # ── mpv config ───────────────────────────────────────────────
     mkdir -p "${home}/.config/mpv"
     cat > "${home}/.config/mpv/mpv.conf" <<'EOF'
-profile=gpu-hq
-vo=gpu-next
-hwdec=auto-safe
-keep-open=yes
 save-position-on-quit=yes
-osd-bar=no
+gpu-api=vulkan
+gpu-context=waylandvk
+hwdec=auto-copy
 border=no
 EOF
 
-    # KeePassXC browser extension for Mullvad Browser
+
+    # ── KeePassXC browser extension for Mullvad Browser ──────────
     local mb_dist_dir=""
     for candidate in \
         "${MOUNT}/usr/lib/mullvad-browser" \
@@ -929,8 +1098,31 @@ EOF
 }
 EOF
 
-    # file associations
-    mkdir -p "${home}/.config"
+    cp "${config_src}/plasmashellrc" "${home}/.config/plasmashellrc" 2>/dev/null || true
+
+    # ── mullvad VPN tray ──────────────────────────────────────────
+    cat > "${home}/.config/autostart/mullvad-vpn.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Mullvad VPN
+Exec=mullvad-vpn
+Icon=mullvad-vpn
+X-KDE-autostart-phase=2
+NoDisplay=true
+EOF
+
+
+    # ── welcome message (installed system only) ──────────────────
+    cat > "${home}/.config/autostart/mulch-welcome.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Mulch Welcome
+Exec=bash -c 'sleep 3 && /usr/local/bin/mulch-welcome'
+X-KDE-autostart-phase=2
+NoDisplay=true
+EOF
+
+    # ── file associations ────────────────────────────────────────
     cat > "${home}/.config/mimeapps.list" <<'EOF'
 [Default Applications]
 application/pdf=org.pwmt.zathura.desktop
@@ -951,102 +1143,23 @@ audio/x-wav=strawberry.desktop
 text/plain=micro.desktop
 EOF
 
-    cat > "${MOUNT}/usr/local/bin/mulch-taskbar-setup" <<'TASKBAR'
-#!/bin/bash
-exec > /tmp/mulch-taskbar.log 2>&1
-echo "$(date): script started as $(whoami)"
+    # ── app state files (panel/toolbar visibility) ───────────────
+    mkdir -p "${home}/.local/state"
+    cp /etc/skel/.local/state/konsolestaterc "${home}/.local/state/" 2>/dev/null || true
+    cp /etc/skel/.local/state/dolphinstaterc "${home}/.local/state/" 2>/dev/null || true
 
-[ "$(whoami)" = "root" ] && echo "root user, exiting" && exit 0
+    # the welcome script is already in the ISO at /usr/local/bin/mulch-welcome
+    # (deployed via profile/airootfs/usr/local/bin/mulch-welcome)
+    # just ensure it's executable on the installed system
+    chmod +x "${MOUNT}/usr/local/bin/mulch-welcome" 2>/dev/null || true
 
-export PATH="/usr/bin:/usr/local/bin:$PATH"
-
-echo "$(date): sleeping 10s"
-sleep 10
-
-RCFILE="$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
-echo "$(date): checking $RCFILE"
-
-if [ ! -f "$RCFILE" ]; then
-    echo "$(date): rcfile not found, exiting"
-    exit 0
-fi
-
-echo "$(date): rcfile found, size $(wc -c < "$RCFILE")"
-echo "$(date): contents:"
-cat "$RCFILE"
-echo ""
-echo "$(date): looking for icontasks"
-
-# find containment and applet numbers using basic grep
-APPLET_LINE=$(grep -n "plugin=org.kde.plasma.icontasks" "$RCFILE" | head -1)
-echo "$(date): applet line: $APPLET_LINE"
-
-if [ -z "$APPLET_LINE" ]; then
-    echo "$(date): icontasks not found, exiting"
-    exit 0
-fi
-
-APPLET_LINENUM=$(echo "$APPLET_LINE" | cut -d: -f1)
-
-# read backwards from that line to find the section header
-SECTION=$(head -n "$APPLET_LINENUM" "$RCFILE" | grep '^\[Containments\]' | tail -1)
-echo "$(date): section: $SECTION"
-
-# extract containment and applet numbers
-CONTAINMENT=$(echo "$SECTION" | sed 's/.*Containments\]\[//' | sed 's/\].*//')
-APPLET=$(echo "$SECTION" | sed 's/.*Applets\]\[//' | sed 's/\].*//')
-
-echo "$(date): containment=$CONTAINMENT applet=$APPLET"
-
-if [ -z "$CONTAINMENT" ] || [ -z "$APPLET" ]; then
-    echo "$(date): could not parse numbers, trying kwriteconfig6 directly"
-fi
-
-LAUNCHERS="applications:steam.desktop,applications:mullvad-browser.desktop,applications:mullvad-vpn.desktop,applications:org.kde.dolphin.desktop,applications:org.kde.konsole.desktop,applications:org.keepassxc.KeePassXC.desktop,applications:mpv.desktop,applications:org.strawberrymusicplayer.strawberry.desktop,applications:signal.desktop,applications:micro.desktop,applications:obsidian.desktop,applications:lazpaint.desktop,applications:org.qbittorrent.qBittorrent.desktop,applications:systemsettings.desktop"
-# method 1: direct sed into config file
-GENERAL_SECTION="[Containments][${CONTAINMENT}][Applets][${APPLET}][Configuration][General]"
-
-echo "$(date): checking if section exists: $GENERAL_SECTION"
-
-if grep -qF "$GENERAL_SECTION" "$RCFILE"; then
-    echo "$(date): section exists, adding launchers after it"
-    sed -i "/${GENERAL_SECTION//[/\\[}/a launchers=${LAUNCHERS}" "$RCFILE"
-else
-    echo "$(date): section does not exist, appending"
-    echo "" >> "$RCFILE"
-    echo "$GENERAL_SECTION" >> "$RCFILE"
-    echo "launchers=${LAUNCHERS}" >> "$RCFILE"
-fi
-
-# remove discover
-sed -i '/org.kde.discover/d' "$RCFILE"
-
-echo "$(date): verifying"
-grep "launchers" "$RCFILE"
-
-echo "$(date): restarting plasmashell"
-kquitapp6 plasmashell 2>/dev/null
-sleep 3
-kstart plasmashell 2>/dev/null &
-
-sleep 5
-echo "$(date): done, removing autostart"
-rm -f "$HOME/.config/autostart/mulch-taskbar.desktop"
-echo "$(date): finished"
-TASKBAR
-
-    chmod +x "${MOUNT}/usr/local/bin/mulch-taskbar-setup"
-
-    cat > "${home}/.config/autostart/mulch-taskbar.desktop" <<'EOF'
-[Desktop Entry]
-Type=Application
-Name=Mulch Taskbar Setup
-Exec=/usr/local/bin/mulch-taskbar-setup
-X-KDE-autostart-phase=2
-NoDisplay=true
+    # ── Mullvad GUI: start minimized to tray (must be last, read-only) ──
+    mkdir -p "${home}/.config/Mullvad VPN"
+    cat > "${home}/.config/Mullvad VPN/gui_settings.json" <<'EOF'
+{"preferredLocale":"system","autoConnect":true,"enableSystemNotifications":true,"monochromaticIcon":false,"startMinimized":true,"unpinnedWindow":true,"browsedForSplitTunnelingApplications":[],"changelogDisplayedForVersion":"2026.1","updateDismissedForVersion":"","animateMap":true}
 EOF
 
-    # fix ownership
+    # ── fix ownership ────────────────────────────────────────────
     arch-chroot "$MOUNT" chown -R "${SEL_USERNAME}:${SEL_USERNAME}" \
         "/home/${SEL_USERNAME}" >> "$LOG" 2>&1
 
@@ -1062,13 +1175,18 @@ do_cleanup() {
     # clear package cache
     rm -rf "${MOUNT}/var/cache/pacman/pkg/"* 2>/dev/null || true
 
-    # sync databases
-    arch-chroot "$MOUNT" pacman -Sy --noconfirm >> "$LOG" 2>&1 || true
+    # remove ALL stale pacman sync databases — user's first `pacman -Sy` or `yay`
+    # will fetch fresh ones from real mirrors (we can't sync here — offline install)
+    rm -rf "${MOUNT}/var/lib/pacman/sync/"* 2>/dev/null || true
+
+    # remove pacman database lock if it exists
+    rm -f "${MOUNT}/var/lib/pacman/db.lck" 2>/dev/null || true
 
     # verify yay
     if [[ -f "${MOUNT}/usr/bin/yay" ]]; then
-        arch-chroot "$MOUNT" su - "${SEL_USERNAME}" -c "yay --version" >> "$LOG" 2>&1 || true
         msg "  ✓ yay available"
+    else
+        warn "  ✗ yay binary not found at /usr/bin/yay"
     fi
 
     sync
@@ -1090,7 +1208,7 @@ main() {
         exit 1
     fi
 
-    : > "$LOG"
+    install -m 600 /dev/null "$LOG"
     log "Installer started"
 
     detect_uefi
@@ -1116,37 +1234,52 @@ main() {
     clear
     echo ""
     echo "  Installing Mulch Linux…"
-    echo "  Logs: ${LOG}"
+    echo ""
     echo ""
 
-    echo "  [5%] Partitioning disk…"
-    do_partition >> "$LOG" 2>&1
+    echo -e "${O}  [5%]${N} Partitioning disk…"
+    if ! do_partition >> "$LOG" 2>&1; then
+        err "Partitioning failed. Check log: $LOG"
+        exit 1
+    fi
 
-    echo "  [10%] Setting up encryption…"
-    do_encrypt >> "$LOG" 2>&1
+    echo -e "${O}  [10%]${N} Setting up encryption…"
+    if ! do_encrypt >> "$LOG" 2>&1; then
+        err "Encryption setup failed. Check log: $LOG"
+        exit 1
+    fi
 
-    echo "  [15%] Formatting partitions…"
-    do_format >> "$LOG" 2>&1
+    echo -e "${O}  [15%]${N} Formatting partitions…"
+    if ! do_format >> "$LOG" 2>&1; then
+        err "Formatting failed. Check log: $LOG"
+        exit 1
+    fi
 
-    echo "  [18%] Mounting filesystems…"
-    do_mount >> "$LOG" 2>&1
+    echo -e "${O}  [18%]${N} Mounting filesystems…"
+    if ! do_mount >> "$LOG" 2>&1; then
+        err "Mounting failed. Check log: $LOG"
+        exit 1
+    fi
 
     echo ""
-    echo "  [20%] Copying system to disk (this takes 2-5 minutes)…"
+    echo -e "${O}  [20%]${N} Copying system to disk (this takes 2-5 minutes)…"
     echo ""
     do_copy_system
 
     echo ""
-    echo "  [60%] Cleaning live-ISO artifacts…"
+    echo -e "${O}  [60%]${N} Cleaning live-ISO artifacts…"
     do_cleanup_live >> "$LOG" 2>&1
 
-    echo "  [65%] Handling kernel selection…"
+    echo -e "${O}  [65%]${N} Handling kernel selection…"
     do_handle_kernel >> "$LOG" 2>&1
 
-    echo "  [70%] Generating fstab…"
-    do_fstab >> "$LOG" 2>&1
+    echo -e "${O}  [70%]${N} Generating fstab…"
+    if ! do_fstab >> "$LOG" 2>&1; then
+        err "fstab generation failed. Check log: $LOG"
+        exit 1
+    fi
 
-    echo "  [72%] Configuring system…"
+    echo -e "${O}  [72%]${N} Configuring system…"
     if ! do_configure >> "$LOG" 2>&1; then
         err "Configuration failed. Check log."
         echo "Press Enter to view log."
@@ -1155,10 +1288,10 @@ main() {
         exit 1
     fi
 
-    echo "  [78%] Installing kernel to boot…"
+    echo -e "${O}  [78%]${N} Installing kernel to boot…"
     do_install_kernel
 
-    echo "  [82%] Installing bootloader…"
+    echo -e "${O}  [82%]${N} Installing bootloader…"
     if ! do_bootloader >> "$LOG" 2>&1; then
         err "Bootloader installation failed. Check log."
         echo "Press Enter to view log."
@@ -1167,16 +1300,16 @@ main() {
         exit 1
     fi
 
-    echo "  [88%] Applying gaming tweaks…"
+    echo -e "${O}  [88%]${N} Applying gaming tweaks…"
     do_gaming_tweaks >> "$LOG" 2>&1
 
-    echo "  [93%] Setting up user config…"
+    echo -e "${O}  [93%]${N} Setting up user config…"
     do_user_config >> "$LOG" 2>&1
 
-    echo "  [97%] Cleaning up…"
+    echo -e "${O}  [97%]${N} Cleaning up…"
     do_cleanup >> "$LOG" 2>&1
 
-    echo "  [100%] Done!"
+    echo -e "${O}  [100%]${N} Done!"
     echo ""
 
     # check for real errors
@@ -1200,8 +1333,12 @@ main() {
     echo "           Username: ${SEL_USERNAME}                   "
     echo "           Hostname: ${SEL_HOSTNAME}                   "
     echo "                                                       "
-    echo "           Type 'reboot' when ready.                   "
+    echo "           Reboot computer when ready.                 "
     echo ""
+
+    echo ""
+    echo "  Press Enter to close the installer"
+    read -r
 }
 
 main "$@"

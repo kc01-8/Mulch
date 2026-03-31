@@ -1,0 +1,8 @@
+{
+    "diffmenu": false,
+    "cleanmenu": false,
+    "removemake": "no",
+    "provides": true,
+    "pgpfetch": true,
+    "cleanAfter": true
+}

@@ -1,0 +1,43 @@
+
+  ╔══════════════════════════════════════════════════════╗
+  ║            Welcome to Mulch Linux!                   ║
+  ╚══════════════════════════════════════════════════════╝
+
+  -- Getting Started --------------------------
+
+  * Update your system:
+      yay
+
+  * Install a package:
+      sudo pacman -S packagename
+
+  * AUR packages:
+      yay -S packagename
+
+  -- Linux Filesystem Basics ------------------
+
+  ~/.config/    - App settings live here
+  /etc/         - System-wide configuration
+  /usr/bin/     - Where programs live
+
+  -- Your Privacy Tools -----------------------
+
+  * Mullvad VPN: Click the tray icon to connect.
+  * Mullvad Browser: KeePassXC extension pre-installed.
+  * KeePassXC: File > New Database, then
+    Tools > Settings > Browser Integration
+  * Tor Browser: For when you need anonymity.
+
+  -- Tips -------------------------------------
+
+  * Default editor: micro (Ctrl+S save, Ctrl+Q quit)
+  * No Flatpak, no Snap. Everything native.
+  * Steam is limited in the RAM-based live
+    environment. Install the system to use it.
+  * yay and pacman are intended for the installed
+    system. Package changes won't persist on live.
+  * Obsidian: Settings > Appearance > Themes
+    > Manage > search "Gruvbox"
+  * Weather widget: Right-click to set location.
+
+  Press Enter to close.

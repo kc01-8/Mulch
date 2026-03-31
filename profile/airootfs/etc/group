@@ -1,0 +1,7 @@
+root:x:0:root
+wheel:x:10:live
+video:x:44:live
+audio:x:63:live
+input:x:97:live
+gamemode:x:385:live
+live:x:1000:live

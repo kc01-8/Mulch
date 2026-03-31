@@ -1,0 +1,11 @@
+{
+    "KPackageStructure": "KWin/Script",
+    "KPlugin": {
+        "Id": "mullvad-minimize",
+        "Name": "Mullvad Minimize",
+        "Description": "Minimizes Mullvad VPN window to tray on open",
+        "Version": "1.0"
+    },
+    "X-Plasma-API": "javascript",
+    "X-Plasma-MainScript": "code/main.js"
+}

@@ -11,7 +11,7 @@ APPLET=$(grep -B1 "plugin=org.kde.plasma.icontasks" "$RCFILE" | grep -oP 'Applet
 
 [ -z "$CONTAINMENT" ] || [ -z "$APPLET" ] && exit 0
 
-LAUNCHERS="applications:mullvad-browser.desktop,applications:mullvad-vpn.desktop,applications:org.keepassxc.KeePassXC.desktop,applications:steam.desktop,applications:org.strawberrymusicplayer.strawberry.desktop,applications:signal.desktop,applications:lazpaint.desktop,applications:obsidian.desktop,applications:org.kde.konsole.desktop,applications:systemsettings.desktop"
+LAUNCHERS="applications:mullvad-browser.desktop,applications:mullvad-vpn.desktop,applications:org.keepassxc.KeePassXC.desktop,applications:steam.desktop,applications:org.strawberrymusicplayer.strawberry.desktop,applications:signal.desktop,applications:obsidian.desktop,applications:org.kde.konsole.desktop,applications:systemsettings.desktop"
 
 kwriteconfig6 --file "$RCFILE" \
     --group "Containments" --group "$CONTAINMENT" \

@@ -1,0 +1,5 @@
+#!/bin/bash
+[ -f "$HOME/.config/mulch-welcomed" ] && exit 0
+konsole -e bash -c "cat /usr/local/share/mulch/welcome.txt; read -r"
+touch "$HOME/.config/mulch-welcomed"
+rm -f "$HOME/.config/autostart/mulch-welcome.desktop"

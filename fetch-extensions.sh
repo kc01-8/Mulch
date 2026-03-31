@@ -9,5 +9,14 @@ XPI_ID="keepassxc-browser@keepassxc.org"
 XPI_URL="https://addons.mozilla.org/firefox/downloads/latest/keepassxc-browser/latest.xpi"
 
 echo "==> Downloading KeePassXC-Browser extension…"
-curl -L -o "${EXT_DIR}/${XPI_ID}.xpi" "$XPI_URL"
+if ! curl -fSL -o "${EXT_DIR}/${XPI_ID}.xpi" "$XPI_URL"; then
+    echo "FATAL: Failed to download extension" >&2
+    exit 1
+fi
+
+if [[ ! -s "${EXT_DIR}/${XPI_ID}.xpi" ]]; then
+    echo "FATAL: Downloaded file is empty" >&2
+    exit 1
+fi
+
 echo "==> Saved to ${EXT_DIR}/${XPI_ID}.xpi"

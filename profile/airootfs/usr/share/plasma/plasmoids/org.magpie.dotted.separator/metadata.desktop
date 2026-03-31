@@ -1,0 +1,19 @@
+[Desktop Entry]
+Name=Dotted Separator
+Comment=XP Style Separator
+Encoding=UTF-8
+Icon=contents/ui/sep.svg
+Keywords=separator
+Type=Service
+
+X-Plasma-API=declarativeappletscript
+X-Plasma-MainScript=ui/main.qml
+
+X-KDE-PluginInfo-Author=Mark Whittaker
+X-KDE-PluginInfo-Category=Utilities
+X-KDE-PluginInfo-Email=phobian@tutanota.com
+X-KDE-PluginInfo-License=GPLv3
+X-KDE-PluginInfo-Name=org.magpie.dotted.separator
+X-KDE-PluginInfo-Version=2.1
+X-KDE-PluginInfo-Website=https://www.pling.com/u/phob1an/
+X-KDE-ServiceTypes=Plasma/Applet

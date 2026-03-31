@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="22"
+   height="22"
+   version="1"
+   id="svg4"
+   sodipodi:docname="klipper.svg"
+   inkscape:version="1.4.1 (93de688d07, 2025-03-30)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs4" />
+  <sodipodi:namedview
+     id="namedview4"
+     pagecolor="#d1d1d1"
+     bordercolor="#111111"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="1"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="31.422058"
+     inkscape:cx="11.759255"
+     inkscape:cy="13.92334"
+     inkscape:current-layer="svg4"
+     showgrid="true">
+    <inkscape:grid
+       id="grid1"
+       units="px"
+       originx="0"
+       originy="0"
+       spacingx="1"
+       spacingy="1"
+       empcolor="#0099e5"
+       empopacity="0.30196078"
+       color="#0099e5"
+       opacity="0.14901961"
+       empspacing="5"
+       dotted="false"
+       gridanglex="30"
+       gridanglez="30"
+       visible="true" />
+  </sodipodi:namedview>
+  <path
+     id="path9"
+     style="opacity:0.33;fill:#000000;stroke-width:1"
+     d="M 10,3 C 8.892,3 8,3.892 8,5 H 7 C 5.892,5 5,5.892 5,7 v 12 c 0,1.108 0.892,2 2,2 h 10 c 1.108,0 2,-0.892 2,-2 V 7 C 19,5.892 18.108,5 17,5 H 16 C 16,3.892 15.108,3 14,3 Z M 7.7148438,6 H 16.285156 C 17.23487,6 18,6.7805002 18,7.75 v 10.5 C 18,19.2195 17.23487,20 16.285156,20 H 7.7148438 C 6.7651294,20 6,19.2195 6,18.25 V 7.75 C 6,6.7805002 6.7651295,6 7.7148438,6 Z" />
+  <path
+     id="rect2"
+     style="opacity:1;fill:#ffffff;stroke-width:1"
+     d="M 9 2 C 7.892 2 7 2.892 7 4 L 6 4 C 4.892 4 4 4.892 4 6 L 4 18 C 4 19.108 4.892 20 6 20 L 16 20 C 17.108 20 18 19.108 18 18 L 18 6 C 18 4.892 17.108 4 16 4 L 15 4 C 15 2.892 14.108 2 13 2 L 9 2 z M 6.7148438 5 L 15.285156 5 C 16.23487 5 17 5.7805002 17 6.75 L 17 17.25 C 17 18.2195 16.23487 19 15.285156 19 L 6.7148438 19 C 5.7651294 19 5 18.2195 5 17.25 L 5 6.75 C 5 5.7805002 5.7651295 5 6.7148438 5 z " />
+  <rect
+     style="opacity:1;fill:#ffffff;stroke-width:1"
+     id="rect3"
+     width="6"
+     height="1"
+     x="8"
+     y="8"
+     rx="0.75"
+     ry="1" />
+  <rect
+     style="opacity:1;fill:#ffffff;stroke-width:1"
+     id="rect4"
+     width="6"
+     height="1"
+     x="8"
+     y="11"
+     rx="0.75"
+     ry="1" />
+  <rect
+     style="opacity:1;fill:#ffffff;stroke-width:0.999996"
+     id="rect5"
+     width="4"
+     height="1"
+     x="8"
+     y="14"
+     rx="0.5"
+     ry="1" />
+  <rect
+     style="opacity:0.33;fill:#000000;stroke-width:1"
+     id="rect7"
+     width="6"
+     height="1"
+     x="9"
+     y="9"
+     rx="0.75"
+     ry="1" />
+  <rect
+     style="opacity:0.33;fill:#000000;stroke-width:1"
+     id="rect8"
+     width="6"
+     height="1"
+     x="9"
+     y="12"
+     rx="0.75"
+     ry="1" />
+  <rect
+     style="opacity:0.33;fill:#000000;stroke-width:0.999996"
+     id="rect9"
+     width="4"
+     height="1"
+     x="9"
+     y="15"
+     rx="0.5"
+     ry="1" />
+</svg>

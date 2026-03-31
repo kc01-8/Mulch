@@ -1,0 +1,23 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "phobian@tutanota.com",
+                "Name": "Mark Whittaker"
+            }
+        ],
+        "Category": "Utilities",
+        "Description": "XP style separator",
+        "EnabledByDefault": true,
+        "Icon": "filename-divider",
+        "Id": "org.magpie.dotted.separator",
+        "License": "GPL3",
+        "Name": "Dotted Separator",
+        "ServiceTypes": [
+            "Plasma/Applet"
+        ],
+        "Version": "2.1",
+        "Website": "https://www.pling.com/u/phob1an/"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

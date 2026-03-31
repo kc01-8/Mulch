@@ -7,7 +7,9 @@ aur-repo/
 profile/airootfs/opt/offline-repo/
 profile/airootfs/opt/kernel-repo/
 /tmp/
+.tmp/
 *.log
 *.pkg.tar.zst
 *.pkg.tar.xz
 *.db.tar.gz
+profile/airootfs/root/config/

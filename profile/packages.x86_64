@@ -192,8 +192,8 @@ memtest86+
 # ── AUR packages (from custom repo) ─────────────────────────────
 yay-bin
 mullvad-vpn-bin
+mullvad-vpn-daemon-bin
 mullvad-browser-bin
 tor-browser-bin
 obsidian-bin
 qimgv-git
-lazpaint-git
